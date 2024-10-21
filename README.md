@@ -21,11 +21,20 @@
 
 ## Features
 
-- TODO
+- Write email templates using Markdown syntax
+- Automatically converts Markdown to HTML
+- Generates plain text version of emails
+- Inlines CSS styles for better email client compatibility
+- Seamless integration with django-templated-email
+- Supports Django template inheritance and tags
 
 ## Dependencies
 
-- TODO
+- Django (>=4.2)
+- django-templated-email (~=3.0)
+- markdown (~=3.7)
+- premailer (~=3.10)
+- html2text (~=2024.2)
 
 ## Installation
 
@@ -89,6 +98,9 @@ $ pip install templated_email_md
 
    Ensure that you provide the necessary context variables used in your templates.
 
+## Documentation
+
+For more detailed information, please refer to the [full documentation][read the docs].
 
 ## Contributing
 
@@ -106,6 +118,11 @@ If you encounter any problems,
 please [file an issue] along with a detailed description.
 
 ## Credits
+
+We are grateful to the maintainers of the following projects
+- [django-templated-email](https://github.com/vintasoftware/django-templated-email/)
+- [emark](https://github.com/voiio/emark)
+
 
 This project was generated from [@OmenApps]'s [Cookiecutter Django Package] template.
 
