@@ -1,6 +1,6 @@
 # Documentation dependencies
 Sphinx==7.1.2
-sphinx-rtd-theme==2.0.0
+sphinx-rtd-theme==3.0.1
 sphinx-click==6.0.0
 myst-parser==4.0
 furo==2024.8.6
