@@ -1,0 +1,1 @@
+"""django-templated-email-md."""
