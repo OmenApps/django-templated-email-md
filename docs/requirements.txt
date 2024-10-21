@@ -13,5 +13,5 @@ markdown==3.7
 premailer==3.10.0
 html2text==2024.2.26
 django-templated-email==3.0.1
-
-
+python-environ==0.4.54
+django-anymail==12.0
