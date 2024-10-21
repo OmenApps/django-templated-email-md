@@ -50,7 +50,9 @@ $ pip install templated_email_md
 
 1. **Update Your Settings:**
 
-   Add the following to your Django `settings.py`:
+   *Assumes you have already installed and configured [django-templated-email](https://github.com/vintasoftware/django-templated-email/).*
+
+   Add or update the following in your Django `settings.py`:
 
    ```python
    TEMPLATED_EMAIL_BACKEND = 'templated_email_md.backend.MarkdownTemplateBackend'
