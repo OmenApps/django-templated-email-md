@@ -547,6 +547,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-django" },
+    { name = "python-environ" },
     { name = "pyupgrade" },
     { name = "safety" },
     { name = "sphinx" },
@@ -557,12 +558,12 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "click", specifier = ">=8.1.7" },
+    { name = "click", specifier = "~=8.1" },
     { name = "django", specifier = ">=4.2" },
     { name = "django-templated-email", specifier = "~=3.0" },
-    { name = "html2text", specifier = "~=2020.1.16" },
-    { name = "markdown", specifier = "~=3.0" },
-    { name = "premailer", specifier = "~=3.0" },
+    { name = "html2text", specifier = "~=2024.2" },
+    { name = "markdown", specifier = "~=3.7" },
+    { name = "premailer", specifier = "~=3.10" },
 ]
 
 [package.metadata.requires-dev]
@@ -588,6 +589,7 @@ dev = [
     { name = "pytest", specifier = ">=8.3.3" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "pytest-django", specifier = ">=4.9.0" },
+    { name = "python-environ", specifier = ">=0.4.54" },
     { name = "pyupgrade", specifier = ">=3.15.2" },
     { name = "safety", specifier = ">=3.2.0" },
     { name = "sphinx", specifier = ">=8.0.2" },
@@ -716,12 +718,9 @@ wheels = [
 
 [[package]]
 name = "html2text"
-version = "2020.1.16"
+version = "2024.2.26"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/6c/f9/033a17d8ea8181aee41f20c74c3b20f1ccbefbbc3f7cd24e3692de99fb25/html2text-2020.1.16.tar.gz", hash = "sha256:e296318e16b059ddb97f7a8a1d6a5c1d7af4544049a01e261731d2d5cc277bbb", size = 49464 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ae/88/14655f727f66b3e3199f4467bafcc88283e6c31b562686bf606264e09181/html2text-2020.1.16-py3-none-any.whl", hash = "sha256:c7c629882da0cf377d66f073329ccf34a12ed2adf0169b9285ae4e63ef54c82b", size = 32055 },
-]
+sdist = { url = "https://files.pythonhosted.org/packages/1a/43/e1d53588561e533212117750ee79ad0ba02a41f52a08c1df3396bd466c05/html2text-2024.2.26.tar.gz", hash = "sha256:05f8e367d15aaabc96415376776cdd11afd5127a77fce6e36afc60c563ca2c32", size = 56527 }
 
 [[package]]
 name = "identify"
@@ -1398,6 +1397,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/02/c0/43c8b2528c24d7f1a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/47/fe/54f387ee1b41c9ad59e48fb8368a361fad0600fe404315e31a12bacaea7d/pytest_django-4.9.0-py3-none-any.whl", hash = "sha256:1d83692cb39188682dbb419ff0393867e9904094a549a7d38a3154d5731b2b99", size = 23723 },
 ]
+
+[[package]]
+name = "python-environ"
+version = "0.4.54"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0c/5d/8d4462fe29d3d3357eaac0f8321b7d0e77d0a4ea64505be1e6a90fba42dc/python-environ-0.4.54.tar.gz", hash = "sha256:6249a14057f95aba3b4906d73276f770e01e659f8098b3f3b34295feac42865b", size = 22947 }
 
 [[package]]
 name = "pyupgrade"
