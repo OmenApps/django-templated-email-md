@@ -1,0 +1,106 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-10-22 17:57+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+#: docs/usage.md:77 docs/usage.md:248
+#: example_project/example/templates/templated_email/test_translated_message.md:1
+#: example_project/example/templates/templated_email_md/test_translated_message.md:1
+msgid "Welcome to Our Service"
+msgstr "Bienvenido a nuestro servicio"
+
+#: docs/usage.md:79 docs/usage.md:250
+#: example_project/example/templates/templated_email/test_translated_message.md:3
+#: example_project/example/templates/templated_email_md/test_translated_message.md:3
+msgid "Thanks for signing up!"
+msgstr "¡Gracias por registrarte!"
+
+#: docs/usage.md:82 docs/usage.md:253
+#: example_project/example/templates/templated_email/test_translated_message.md:7
+#: example_project/example/templates/templated_email_md/test_translated_message.md:7
+msgid "Welcome"
+msgstr "Bienvenido"
+
+#: docs/usage.md:84 docs/usage.md:255
+#: example_project/example/templates/templated_email/test_translated_message.md:9
+#: example_project/example/templates/templated_email_md/test_translated_message.md:9
+msgid ""
+"We're thrilled to have you join our service. Here are a few things you can "
+"do to get started:"
+msgstr ""
+"Estamos encantados de que se una a nuestro servicio. Aquí hay algunas cosas que puede hacer "
+"hacer para empezar:"
+
+#: docs/usage.md:86 docs/usage.md:257
+#: example_project/example/templates/templated_email/test_translated_message.md:11
+#: example_project/example/templates/templated_email_md/test_translated_message.md:11
+msgid "Complete your profile"
+msgstr "Completa tu perfil"
+
+#: docs/usage.md:87 docs/usage.md:258
+#: example_project/example/templates/templated_email/test_translated_message.md:12
+#: example_project/example/templates/templated_email_md/test_translated_message.md:12
+msgid "Explore our features"
+msgstr "Explora nuestras características"
+
+#: docs/usage.md:88 docs/usage.md:259
+#: example_project/example/templates/templated_email/test_translated_message.md:13
+#: example_project/example/templates/templated_email_md/test_translated_message.md:13
+msgid "Connect with other users"
+msgstr "Conectar con otros usuarios"
+
+#: docs/usage.md:90 docs/usage.md:261
+#: example_project/example/templates/templated_email/test_translated_message.md:15
+#: example_project/example/templates/templated_email_md/test_translated_message.md:15
+msgid ""
+"If you have any questions, don't hesitate to reach out to our support team."
+msgstr "Si tiene alguna pregunta, no dude en comunicarse con nuestro equipo de soporte."
+
+#: docs/usage.md:92 docs/usage.md:263
+#: example_project/example/templates/templated_email/test_translated_message.md:17
+#: example_project/example/templates/templated_email_md/test_translated_message.md:17
+msgid "Best regards,"
+msgstr "Atentamente,"
+
+#: docs/usage.md:93 docs/usage.md:264
+#: example_project/example/templates/templated_email/test_translated_message.md:18
+#: example_project/example/templates/templated_email_md/test_translated_message.md:18
+msgid "The Team"
+msgstr "El equipo"
+
+#: example_project/example/templates/templated_email/test_translation.md:3
+#: example_project/example/templates/templated_email_md/test_translation.md:3
+msgid "Test Email"
+msgstr "Correo electrónico de prueba"
+
+#: example_project/example/templates/templated_email/test_translation.md:7
+#: example_project/example/templates/templated_email_md/test_translation.md:7
+msgid "Hello"
+msgstr "Hola"
+
+#: example_project/example/templates/templated_email/test_translation.md:9
+#: example_project/example/templates/templated_email_md/test_translation.md:9
+msgid "This is a test email."
+msgstr "Este es un correo electrónico de prueba."
+
+#~ msgid "Email template rendering failed."
+#~ msgstr "Error al renderizar la plantilla de correo electrónico."
+
+#~ msgid "No Subject"
+#~ msgstr "No sujeta"

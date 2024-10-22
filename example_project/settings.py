@@ -113,6 +113,7 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 
 USE_I18N = True
+LOCALE_PATHS = [BASE_DIR / "example_project/example/locale", BASE_DIR / "src/templated_email_md/locale"]
 
 USE_TZ = True
 
