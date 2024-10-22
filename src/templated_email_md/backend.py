@@ -54,8 +54,10 @@ class MarkdownTemplateBackend(TemplateBackend):
             template_suffix=template_suffix,
             **kwargs,
         )
-        self.template_suffix = template_suffix or getattr(settings, 'TEMPLATED_EMAIL_FILE_EXTENSION', 'md')
+        if fail_silently is None:
+            fail_silently = getattr(settings, "TEMPLATED_EMAIL_FAIL_SILENTLY", False)
         self.fail_silently = fail_silently
+        self.template_suffix = template_suffix or getattr(settings, "TEMPLATED_EMAIL_FILE_EXTENSION", "md")
         self.base_html_template = getattr(
             settings,
             "TEMPLATED_EMAIL_BASE_HTML_TEMPLATE",
@@ -70,6 +72,7 @@ class MarkdownTemplateBackend(TemplateBackend):
                 "markdown.extensions.extra",
             ],
         )
+        self.html2text_settings = getattr(settings, "TEMPLATED_EMAIL_HTML2TEXT_SETTINGS", {})
 
     def _render_markdown(self, content: str) -> str:
         """Convert Markdown content to HTML.
@@ -119,10 +122,10 @@ class MarkdownTemplateBackend(TemplateBackend):
     def _get_template_path(self, template_name: str, template_dir: Optional[str], file_extension: Optional[str]) -> str:
         """Construct the full template path."""
         extension = file_extension or self.template_suffix
-        if extension.startswith('.'):
+        if extension.startswith("."):
             extension = extension[1:]
 
-        prefix = template_dir if template_dir else (self.template_prefix or '')
+        prefix = template_dir if template_dir else (self.template_prefix or "")
         template_path = f"{prefix}{template_name}"
         if not template_path.endswith(f".{extension}"):
             template_path = f"{template_path}.{extension}"
@@ -138,17 +141,16 @@ class MarkdownTemplateBackend(TemplateBackend):
         if subject_start != -1:
             subject_end = template_content.find("{% endblock %}", subject_start)
             if subject_end != -1:
-                subject = template_content[subject_start + 19:subject_end].strip()
+                subject = template_content[subject_start + 19 : subject_end].strip()
                 # Render any template variables in subject
                 subject_template = Template(subject)
-                blocks['subject'] = subject_template.render(Context(context))
+                blocks["subject"] = subject_template.render(Context(context))
                 # Remove subject block from content
                 template_content = (
-                    template_content[:subject_start].strip() +
-                    template_content[subject_end + 13:].strip()
+                    template_content[:subject_start].strip() + template_content[subject_end + 13 :].strip()
                 )
 
-        blocks['content'] = template_content.strip()
+        blocks["content"] = template_content.strip()
         return blocks
 
     def _generate_plain_text(self, html_content: str) -> str:
@@ -161,12 +163,19 @@ class MarkdownTemplateBackend(TemplateBackend):
             Plain text content without Markdown formatting
         """
         h = html2text.HTML2Text()
+
+        # Apply default settings
         h.ignore_links = False
         h.ignore_images = True
         h.body_width = 0
-        h.ignore_emphasis = True  # Do not add '*' around bold/italic text
-        h.mark_code = False       # Do not add backticks around code
-        h.wrap_links = False      # Do not wrap links in brackets
+        h.ignore_emphasis = True
+        h.mark_code = False
+        h.wrap_links = False
+
+        # Override with user-defined settings
+        for setting_name, setting_value in self.html2text_settings.items():
+            setattr(h, setting_name, setting_value)
+
         return h.handle(html_content).strip()
 
     def _render_email(
@@ -191,35 +200,16 @@ class MarkdownTemplateBackend(TemplateBackend):
 
         try:
             template_path = self._get_template_path(
-                template_name if isinstance(template_name, str) else template_name[0],
-                template_dir,
-                file_extension
+                template_name if isinstance(template_name, str) else template_name[0], template_dir, file_extension
             )
 
-            # Use render_block_to_string to get 'subject' block
-            try:
-                subject = render_block_to_string(template_path, 'subject', context).strip()
-            except BlockNotFound:
-                subject = _("No Subject")
+            subject = self._get_subject_from_template(template_path, context)
 
-            # Override subject if 'subject' is in context
-            subject = context.get('subject', subject)
+            preheader = self._get_preheader_from_template(template_path, context)
 
-            # Use render_block_to_string to get 'content' block
-            try:
-                content = render_block_to_string(template_path, 'content', context).strip()
-            except BlockNotFound:
-                # If 'content' block is not defined, render the entire template without the 'subject' block
-                md_template = get_template(template_path)
-                template_source = md_template.template.source
-                # Remove the 'subject' block from the template source
-                pattern = r'{% block subject %}.*?{% endblock %}'
-                content_without_subject = re.sub(pattern, '', template_source, flags=re.DOTALL).strip()
-                content_template = Template(content_without_subject)
-                content = content_template.render(Context(context))
+            content = self._get_content_from_template(template_path, context)
 
-            # Convert markdown content to HTML
-            html_content = self._render_markdown(content)
+            html_content = self._get_html_content_from_template(content)
 
             # Get the base template
             base_template = get_template(self.base_html_template)
@@ -227,8 +217,9 @@ class MarkdownTemplateBackend(TemplateBackend):
             # Create context for base template with all needed variables
             base_context = {
                 **context,  # Original context
-                'markdown_content': html_content,
-                'subject': context.get('subject', subject),
+                "markdown_content": html_content,
+                "subject": context.get("subject", subject),
+                "preheader": context.get("preheader", preheader),
             }
 
             # Render base template
@@ -237,30 +228,154 @@ class MarkdownTemplateBackend(TemplateBackend):
             # Inline CSS
             inlined_html = self._inline_css(rendered_html)
 
-            # Generate plain text from HTML content (not the full email template)
-            plain_text = self._generate_plain_text(html_content)
+            # Remove comments from the final HTML message
+            rendered_html = self._remove_comments(rendered_html)
 
-            return {
-                'html': inlined_html,
-                'plain': plain_text,
-                'subject': subject,
-            }
+            plain_text = self._get_plain_text_content_from_template(html_content)
+
+            return {"html": inlined_html, "plain": plain_text, "subject": subject, "preheader": preheader}
 
         except Exception as e:
             logger.error("Failed to render email: %s", str(e))
             if self.fail_silently:
                 return {
-                    'html': fallback_content,
-                    'plain': fallback_content,
-                    'subject': _("No Subject"),
+                    "html": fallback_content,
+                    "plain": fallback_content,
+                    "subject": _("No Subject"),
+                    "preheader": _("No Preheader"),
                 }
             raise
 
-    def _get_subject_from_template(self, context: Dict[str, Any]) -> Optional[str]:
-        """Extract subject from template block."""
+    def _get_subject_from_template(self, template_path: str, context: Dict[str, Any]) -> Optional[str]:
+        """Extract subject from template block.
+
+        Args:
+            template_path: Path to the template file
+            context: Context to render the template with
+
+        Returns:
+            Subject text
+        """
         try:
-            return render_block_to_string(
-                [self.base_html_template], "subject", context
-            ).strip()
+            subject = render_block_to_string(template_path, "subject", context).strip()
         except BlockNotFound:
-            return None
+            subject = _("No Subject")
+
+        # Override subject if 'subject' is in context
+        subject = context.get("subject", subject)
+
+        return subject
+
+    def _get_preheader_from_template(self, template_path: str, context: Dict[str, Any]) -> Optional[str]:
+        """Extract preheader from template block.
+
+        Args:
+            template_path: Path to the template file
+            context: Context to render the template with
+
+        Returns:
+            Preheader text
+        """
+        try:
+            preheader = render_block_to_string(template_path, "preheader", context).strip()
+        except BlockNotFound:
+            preheader = _("No Preheader")
+
+        # Override preheader if 'preheader' is in context
+        preheader = context.get("preheader", preheader)
+
+        return preheader
+
+    def _get_content_from_template(
+        self,
+        template_path: str,
+        context: Dict[str, Any],
+    ) -> Dict[str, str]:
+        """Extract content from template block.
+
+        Args:
+            template_path: Path to the template file
+            context: Context to render the template with
+
+        Returns:
+            Dictionary containing the rendered HTML, plain text, and subject.
+        """
+        try:
+            content = render_block_to_string(template_path, "content", context).strip()
+        except BlockNotFound:
+            # If 'content' block is not defined, render the entire template without 'subject' and 'preheader' blocks
+            md_template = get_template(template_path)
+            template_source = md_template.template.source
+            # Remove the 'subject' and 'preheader' blocks from the template source
+            patterns = [
+                r"{% block subject %}.*?{% endblock %}",
+                r"{% block subject %}.*?{% endblock subject %}",
+                r"{% block preheader %}.*?{% endblock %}",
+                r"{% block preheader %}.*?{% endblock preheader %}",
+            ]
+            content_without_subject_or_preheader = template_source
+            for pattern in patterns:
+                content_without_subject_or_preheader = re.sub(
+                    pattern, "", content_without_subject_or_preheader, flags=re.DOTALL
+                ).strip()
+
+            content_template = Template(content_without_subject_or_preheader)
+            content = content_template.render(Context(context))
+        return content
+
+    def _get_html_content_from_template(
+        self,
+        content: str,
+    ) -> str:
+        """Render the email content using the Markdown template and base HTML template.
+
+        Args:
+            template_name (str or list): The name of the Markdown template to render.
+            context (dict): The context to render the template with.
+            template_dir (str): The directory to look for the template in.
+            file_extension (str): The file extension of the template file.
+
+        Returns:
+            Rendered HTML content.
+        """
+        try:
+            html_content = self._render_markdown(content)
+        except Exception as e:
+            if self.fail_silently:
+                logger.error("Error rendering email: %s", e)
+                html_content = "Email template rendering failed."
+            else:
+                raise
+        # Remove comments from the final HTML message
+        html_content = self._remove_comments(html_content)
+        return html_content
+
+    def _get_plain_text_content_from_template(
+        self,
+        content: str,
+    ) -> str:
+        """Generate plain text content from HTML.
+
+        Args:
+            html_content: HTML content to convert
+
+        Returns:
+            Plain text content without Markdown formatting
+        """
+        try:
+            plain_text = self._generate_plain_text(content)
+        except Exception as e:
+            if self.fail_silently:
+                logger.error("Error generating plain text: %s", e)
+                plain_text = "Email template rendering failed."
+            else:
+                raise
+        return plain_text
+
+    def _remove_comments(self, html: str) -> str:
+        """Remove HTML comments and JavaScript/CSS comments from the HTML content."""
+        # Remove HTML comments (excluding conditional comments for Outlook)
+        html = re.sub(r"<!--(?!\[if).*?-->", "", html, flags=re.DOTALL)
+        # Remove JavaScript and CSS comments
+        html = re.sub(r"/\*.*?\*/", "", html, flags=re.DOTALL)
+        return html
