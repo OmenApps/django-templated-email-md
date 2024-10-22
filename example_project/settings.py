@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "anymail",
+    "templated_email_md",
     "example_project.example",
 ]
 

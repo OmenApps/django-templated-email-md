@@ -150,18 +150,10 @@ def safety(session: Session, django: str) -> None:
 @nox.parametrize("django", DJANGO_VERSIONS)
 def tests(session: Session, django: str) -> None:
     """Run the test suite."""
-    session.install(f"django=={django}")
-    session.install(".")
-    session.install(
-        "coverage[toml]",
-        "pytest",
-        "pytest-django",
-        "requests",
-        "pygments",
-    )
+    session.run("uv", "sync", "--prerelease=allow", "--extra=dev")
     try:
 
-        session.run("coverage", "run", "-m", "pytest", *session.posargs)
+        session.run("coverage", "run", "-m", "pytest", "-vv", *session.posargs)
     finally:
         if session.interactive:
             session.notify("coverage", posargs=[])

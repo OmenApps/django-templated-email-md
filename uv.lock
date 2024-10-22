@@ -491,6 +491,20 @@ wheels = [
 ]
 
 [[package]]
+name = "django-anymail"
+version = "12.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "requests" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/91/cd/34eca54757511df252ae8b56f5b75f3d137cc51ba53c7c5c74b8d449fa0d/django_anymail-12.0.tar.gz", hash = "sha256:65789c1b0f42915aa0450a4f173f77572d4c552979b748ddd8125af41972ad30", size = 95175 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3d/09/83c613d8781d56af7b8736c7c968f8dc0487763b2680ae9d726a7313c9de/django_anymail-12.0-py3-none-any.whl", hash = "sha256:de8458d713d0f9776da9ed04dcd3a0161be23e9ecbcb49dcf149219700ecd274", size = 131312 },
+]
+
+[[package]]
 name = "django-render-block"
 version = "0.10"
 source = { registry = "https://pypi.org/simple" }
@@ -518,6 +532,7 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "django" },
+    { name = "django-render-block" },
     { name = "django-templated-email" },
     { name = "html2text" },
     { name = "markdown" },
@@ -530,6 +545,7 @@ dev = [
     { name = "black" },
     { name = "coverage", extra = ["toml"] },
     { name = "darglint" },
+    { name = "django-anymail" },
     { name = "flake8" },
     { name = "flake8-bugbear" },
     { name = "flake8-docstrings" },
@@ -560,6 +576,7 @@ dev = [
 requires-dist = [
     { name = "click", specifier = "~=8.1" },
     { name = "django", specifier = ">=4.2" },
+    { name = "django-render-block", specifier = "~=0.8" },
     { name = "django-templated-email", specifier = "~=3.0" },
     { name = "html2text", specifier = "~=2024.2" },
     { name = "markdown", specifier = "~=3.7" },
@@ -572,6 +589,7 @@ dev = [
     { name = "black", specifier = ">=24.4.2" },
     { name = "coverage", extras = ["toml"], specifier = ">=7.5.1" },
     { name = "darglint", specifier = ">=1.8.1" },
+    { name = "django-anymail", specifier = "~=12.0" },
     { name = "flake8", specifier = "==7.0.0" },
     { name = "flake8-bugbear", specifier = ">=24.4.26" },
     { name = "flake8-docstrings", specifier = ">=1.7.0" },
@@ -589,7 +607,7 @@ dev = [
     { name = "pytest", specifier = ">=8.3.3" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "pytest-django", specifier = ">=4.9.0" },
-    { name = "python-environ", specifier = ">=0.4.54" },
+    { name = "python-environ", specifier = "~=0.4" },
     { name = "pyupgrade", specifier = ">=3.15.2" },
     { name = "safety", specifier = ">=3.2.0" },
     { name = "sphinx", specifier = ">=8.0.2" },
