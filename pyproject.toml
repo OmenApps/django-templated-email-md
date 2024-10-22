@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=70.0"]
+requires = ["setuptools>=75.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "django-templated-email-md"
-version = "2024.10.2"
+version = "2024.10.3"
 description = "An extension for django-templated-email for creating emails with Markdown"
 authors = [{ name = "Jack Linke", email = "jacklinke@gmail.com" }]
 license = { text = "MIT" }
@@ -77,6 +77,19 @@ dev-dependencies = [
     "django-anymail~=12.0",
     "python-environ~=0.4",
 ]
+
+# [tool.setuptools]
+# # ...
+# # By default, include-package-data is true in pyproject.toml,
+# # so you do NOT have to specify this line.
+# include-package-data = true
+# package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+templated_email_md = ["templates/templated_email/*", "**/*.po"]
 
 [tool.black]
 line-length = 120

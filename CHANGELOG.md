@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2024.10.3]
+
+- Fix issue with files not being included in the package.
+
 ## [2024.10.2]
 
 Minor fixes and improvements.
