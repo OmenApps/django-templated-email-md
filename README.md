@@ -21,84 +21,103 @@
 
 ## Features
 
-- Write email templates using Markdown syntax
-- Automatically converts Markdown to HTML
-- Generates plain text version of emails
-- Inlines CSS styles for better email client compatibility
-- Seamless integration with django-templated-email
-- Supports Django template inheritance and tags
-
-## Dependencies
-
-- Django (>=4.2)
-- django-templated-email (~=3.0)
-- markdown (~=3.7)
-- premailer (~=3.10)
-- html2text (~=2024.2)
+- **Markdown Templates**: Write email templates using Markdown syntax for cleaner and more readable templates.
+- **Automatic Conversion**: Automatically converts Markdown to HTML and generates a plain text version of emails.
+- **CSS Inlining**: Inlines CSS styles for better email client compatibility using Premailer.
+- **Seamless Integration**: Works as an extension of `django-templated-email`, allowing for easy integration into existing projects.
+- **Template Inheritance**: Supports Django template inheritance and template tags in your Markdown templates.
 
 ## Installation
 
-You can install _django-templated-email-md_ via [pip] from [PyPI]:
+You can install `django-templated-email-md` via [pip] from [PyPI]:
 
-```console
-$ pip install templated_email_md
+```bash
+pip install django-templated-email-md
+```
+
+### Add to `INSTALLED_APPS`
+
+Add `templated_email_md` to your `INSTALLED_APPS` in `settings.py`:
+
+```python
+INSTALLED_APPS = [
+    # ...
+    'templated_email_md',
+    # ...
+]
+```
+
+## Configuration
+
+Assuming you have already installed and configured [django-templated-email](https://github.com/vintasoftware/django-templated-email/), update your Django settings as follows:
+
+```python
+# settings.py
+
+# Configure the templated email backend
+TEMPLATED_EMAIL_BACKEND = 'templated_email_md.backend.MarkdownTemplateBackend'
+
+# Optional: Specify the base HTML template for wrapping your content. See the Usage guide for details.
+TEMPLATED_EMAIL_BASE_HTML_TEMPLATE = 'templated_email/markdown_base.html'
+
+# Set the directory where your email templates are stored
+TEMPLATED_EMAIL_TEMPLATE_DIR = 'templated_email/'  # Ensure there's a trailing slash
+
+# Define the file extension for your Markdown templates
+TEMPLATED_EMAIL_FILE_EXTENSION = 'md'
+
+# Optional: Specify Markdown extensions if needed
+TEMPLATED_EMAIL_MARKDOWN_EXTENSIONS = [
+    'markdown.extensions.extra',
+    'markdown.extensions.meta',
+    'markdown.extensions.tables',
+]
 ```
 
 ## Usage
 
-**Usage Instructions:**
+### Creating Markdown Templates
 
-1. **Update Your Settings:**
+Place your Markdown email templates in the `templated_email/` directory within your project's templates directory. For example, create a file `templated_email/welcome.md`:
 
-   *Assumes you have already installed and configured [django-templated-email](https://github.com/vintasoftware/django-templated-email/).*
+```markdown
+{% block subject %}Welcome to Our Service{% endblock %}
 
-   Add or update the following in your Django `settings.py`:
+{% block preheader %}Thanks for signing up!{% endblock %}
 
-   ```python
-   TEMPLATED_EMAIL_BACKEND = 'templated_email_md.backend.MarkdownTemplateBackend'
-   TEMPLATED_EMAIL_BASE_HTML_TEMPLATE = 'templated_email/markdown_base.html'
-   TEMPLATED_EMAIL_TEMPLATE_DIR = 'templated_email/'  # Ensure there's a trailing slash
-   TEMPLATED_EMAIL_FILE_EXTENSION = 'md'
-   ```
+{% block content %}
+# Welcome, {{ user.first_name }}!
 
-2. **Create Your Markdown Email Templates:**
+We're thrilled to have you join our service. Here are a few things you can do to get started:
 
-   Place your Markdown email templates in the `templated_email/` directory. For example, create a file `templated_email/welcome.md`:
+1. **Complete your profile**
+2. **Explore our features**
+3. **Connect with other users**
 
-   ```markdown
-   {% block subject %}Welcome to Our Service{% endblock %}
+If you have any questions, don't hesitate to reach out to our support team.
 
-   {% block preheader %}Thanks for signing up!{% endblock %}
+Best regards,
+The Team
+{% endblock %}
+```
 
-   Hi {{ user.first_name }},
+### Sending Emails
 
-   Welcome to our service! We're glad to have you.
+Use the `send_templated_mail` function to send emails using your Markdown templates, just as you would with the base django-templated-email package:
 
-   **Enjoy your stay!**
+```python
+from templated_email import send_templated_mail
 
-   Best regards,
-   The Team
-   ```
-
-3. **Send Templated Emails:**
-
-   Use the `send_templated_mail` function to send emails:
-
-   ```python
-   from templated_email import send_templated_mail
-
-   send_templated_mail(
-       template_name='welcome',
-       from_email='from@example.com',
-       recipient_list=['to@example.com'],
-       context={
-           'user': user_instance,
-           # Add other context variables if needed
-       },
-   )
-   ```
-
-   Ensure that you provide the necessary context variables used in your templates.
+send_templated_mail(
+    template_name='welcome',
+    from_email='from@example.com',
+    recipient_list=['to@example.com'],
+    context={
+        'user': user_instance,
+        # Add other context variables as needed
+    },
+)
+```
 
 ## Documentation
 
@@ -106,36 +125,30 @@ For more detailed information, please refer to the [full documentation][read the
 
 ## Contributing
 
-Contributions are very welcome.
-To learn more, see the [Contributor Guide].
+Contributions are very welcome. To learn more, see the [Contributor Guide].
 
 ## License
 
-Distributed under the terms of the [MIT license][license],
-_django-templated-email-md_ is free and open source software.
+Distributed under the terms of the [MIT license][license], `django-templated-email-md` is free and open source software.
 
 ## Issues
 
-If you encounter any problems,
-please [file an issue] along with a detailed description.
+If you encounter any problems, please [file an issue] along with a detailed description.
 
 ## Credits
 
-We are grateful to the maintainers of the following projects
+We are grateful to the maintainers of the following projects:
+
 - [django-templated-email](https://github.com/vintasoftware/django-templated-email/)
 - [emark](https://github.com/voiio/emark)
-
 
 This project was generated from [@OmenApps]'s [Cookiecutter Django Package] template.
 
 [@omenapps]: https://github.com/OmenApps
 [pypi]: https://pypi.org/
-[cookiecutter django package]: https://github.com/OmenApps/cookiecutter-django-package
-[file an issue]: https://github.com/OmenApps/django-templated-email-md/issues
-[pip]: https://pip.pypa.io/
-
-<!-- github-only -->
-
 [license]: https://github.com/OmenApps/django-templated-email-md/blob/main/LICENSE
+[read the docs]: https://django-templated-email-md.readthedocs.io/
 [contributor guide]: https://github.com/OmenApps/django-templated-email-md/blob/main/CONTRIBUTING.md
-[command-line reference]: https://django-templated-email-md.readthedocs.io/en/latest/usage.html
+[file an issue]: https://github.com/OmenApps/django-templated-email-md/issues
+[cookiecutter django package]: https://github.com/OmenApps/cookiecutter-django-package
+[pip]: https://pip.pypa.io/
