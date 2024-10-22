@@ -4,7 +4,7 @@ import pytest
 from django.conf import settings
 from django.core import mail
 from django.template import TemplateDoesNotExist
-from django.test import override_settings
+from django.utils import translation
 from templated_email import send_templated_mail
 
 from templated_email_md.backend import MarkdownTemplateBackend
@@ -20,12 +20,6 @@ def test_settings() -> None:
     assert settings.USE_TZ is True
 
 
-@pytest.fixture
-def backend():
-    """Create a MarkdownTemplateBackend instance."""
-    return MarkdownTemplateBackend()
-
-
 def test_markdown_conversion(backend):
     """Test conversion of Markdown to HTML."""
     response = backend._render_email("test_message", {"name": "Test User"})
@@ -36,13 +30,13 @@ def test_markdown_conversion(backend):
     assert "<ol" in response["html"]
     assert 'href="http://example.com"' in response["html"]
 
+
 def test_plain_text_generation(backend):
     """Test generation of plain text version."""
     response = backend._render_email("test_message", {"name": "Test User"})
 
     assert "Hello Test User!" in response["plain"]
     assert "**" not in response["plain"]  # Markdown syntax should be converted
-    # assert "[A link](http://example.com)" not in response["plain"]  # May need to further adjust html2text configs
     assert "http://example.com" in response["plain"]
 
 
@@ -53,16 +47,16 @@ def test_css_inlining(backend):
     assert 'style="' in response["html"]
 
 
-def test_template_inheritance(backend):
-    """Test that template inheritance works correctly."""
+def test_template_missing(backend):
+    """Test that missing templates raise an exception."""
     with pytest.raises(TemplateDoesNotExist):
         # Should raise if referenced template doesn't exist
         backend._render_email("non_existent_template", {})
 
 
-@override_settings(TEMPLATED_EMAIL_BACKEND='templated_email_md.backend.MarkdownTemplateBackend')
 def test_send_templated_mail():
     """Test sending an email using the backend."""
+    settings.TEMPLATED_EMAIL_BACKEND = "templated_email_md.backend.MarkdownTemplateBackend"
     send_templated_mail(
         template_name="test_message",
         from_email="from@example.com",
@@ -83,11 +77,14 @@ def test_missing_subject_block(backend):
         backend._render_email("non_existent", {})
 
 
-@pytest.mark.parametrize("context,expected", [
-    ({"name": "Test"}, "Test"),
-    ({"name": ""}, ""),
-    ({}, ""),  # Missing context variable
-])
+@pytest.mark.parametrize(
+    "context,expected",
+    [
+        ({"name": "Test"}, "Test"),
+        ({"name": ""}, ""),
+        ({}, ""),  # Missing context variable
+    ],
+)
 def test_context_handling(backend, context, expected):
     """Test handling of different context scenarios."""
     response = backend._render_email("test_message", context)
@@ -103,9 +100,9 @@ def test_template_not_found(backend):
         backend._render_email("non_existent_template", {})
 
 
-@override_settings(TEMPLATED_EMAIL_BACKEND='templated_email_md.backend.MarkdownTemplateBackend')
 def test_full_email_rendering():
     """Test the complete email rendering process."""
+    settings.TEMPLATED_EMAIL_BACKEND = "templated_email_md.backend.MarkdownTemplateBackend"
     send_templated_mail(
         template_name="test_message",
         from_email="from@example.com",
@@ -129,9 +126,9 @@ def test_full_email_rendering():
     assert "<strong>bold</strong>" in html_content
 
 
-@override_settings(TEMPLATED_EMAIL_BACKEND='templated_email_md.backend.MarkdownTemplateBackend')
 def test_fail_silently():
     """Test that fail_silently works as expected."""
+    settings.TEMPLATED_EMAIL_BACKEND = "templated_email_md.backend.MarkdownTemplateBackend"
     backend = MarkdownTemplateBackend(fail_silently=True)
 
     # Try to render a non-existent template
@@ -145,8 +142,240 @@ def test_fail_silently():
 
 def test_subject_from_context(backend):
     """Test that subject can be overridden from context."""
-    response = backend._render_email(
-        "test_message",
-        {"name": "Test User", "subject": "Override Subject"}
-    )
+    response = backend._render_email("test_message", {"name": "Test User", "subject": "Override Subject"})
     assert response["subject"] == "Override Subject"
+
+
+def test_subject_in_context():
+    """Test that providing 'subject' in context overrides the template subject."""
+    send_templated_mail(
+        template_name="test_message",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={"name": "Test User", "subject": "Subject from Context"},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    assert email.subject == "Subject from Context"
+
+
+def test_subject_from_template():
+    """Test that the subject defined in the template is used."""
+    send_templated_mail(
+        template_name="test_subject_block",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={"name": "Test User"},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    assert email.subject == "Subject from Template"
+
+
+def test_email_translation():
+    """Test that the email is translated according to the active language."""
+    with translation.override("es"):
+        send_templated_mail(
+            template_name="test_translation",
+            from_email="from@example.com",
+            recipient_list=["to@example.com"],
+            context={"name": "Test User"},
+        )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    # Check that the email subject and body are in Spanish
+    assert email.subject == "Correo electrónico de prueba"
+    assert "Hola Test User!" in email.body
+
+
+def test_override_html2text_settings():
+    """Test that overriding html2text settings affects plain text output."""
+    settings.TEMPLATED_EMAIL_HTML2TEXT_SETTINGS = {"ignore_links": True}
+    send_templated_mail(
+        template_name="test_message_with_link",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={"name": "Test User"},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    # Check that the link is not in the plain text version
+    assert "http://example.com" not in email.body
+    # Ensure the link is still in the HTML version
+    html_content = email.alternatives[0][0]
+    assert "http://example.com" in html_content
+
+
+def test_template_inheritance():
+    """Test that template inheritance works correctly."""
+    send_templated_mail(
+        template_name="child_email",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    assert email.subject == "Child Email Subject"
+    assert "Child Email Content" in email.body
+
+
+def test_template_name_list():
+    """Test that providing a list of template names works."""
+    send_templated_mail(
+        template_name=["test_message", "test_message"],
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={"name": "Test User"},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    # Should have used 'test_message' template
+    assert "Hello Test User!" in email.body
+
+
+def test_markdown_extensions(settings):
+    """Test that custom markdown extensions are applied."""
+    settings.TEMPLATED_EMAIL_MARKDOWN_EXTENSIONS = ["markdown.extensions.tables"]
+
+    send_templated_mail(
+        template_name="test_markdown_table",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    html_content = email.alternatives[0][0]
+
+    # Check that the table is rendered correctly in HTML
+    assert "<table" in html_content
+    assert "Header 1</th>" in html_content
+
+
+def test_large_email_content():
+    """Test that large email content is handled correctly."""
+
+    send_templated_mail(
+        template_name="test_large_content",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    assert "This is a line." in email.body
+
+
+def test_unusual_markdown_features():
+    """Test that unusual markdown features are handled correctly."""
+    settings.TEMPLATED_EMAIL_MARKDOWN_EXTENSIONS = ["markdown.extensions.footnotes"]
+    send_templated_mail(
+        template_name="test_unusual_markdown",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    html_content = email.alternatives[0][0]
+
+    # Check that footnotes are rendered if the extension is enabled
+    assert "footnote-backref" in html_content
+
+
+def test_empty_context():
+    """Test sending an email with an empty context."""
+    send_templated_mail(
+        template_name="test_message",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={},  # Empty context
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    # Ensure that default values or empty strings are used for variables
+    assert "Hello" in email.body
+
+
+def test_preheader_from_template():
+    """Test that the preheader defined in the template is included in the email."""
+    send_templated_mail(
+        template_name="test_preheader_block",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={"name": "Test User"},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    # Check that preheader is in the HTML alternative email body, but not plain text
+    assert "Preheader from Template" in email.alternatives[0][0]
+    assert "Preheader from Template" not in email.body  # Should not be in plain text
+
+
+def test_preheader_in_context():
+    """Test that providing 'preheader' in context adds it to the email."""
+    send_templated_mail(
+        template_name="test_message",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={"name": "Test User", "preheader": "Preheader from Context"},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    # Check that preheader is in the HTML alternative email body, but not plain text
+    assert "Preheader from Context" in email.alternatives[0][0]
+    assert "Preheader from Context" not in email.body  # Should not be in plain text
+
+
+def test_remove_comments():
+    """Test that HTML and JavaScript comments are removed from the HTML content."""
+    backend = MarkdownTemplateBackend()
+    html_with_comments = """
+    <!-- HTML Comment -->
+    <div>
+      Content here
+      <!-- Another comment -->
+      <style>
+        /* CSS Comment */
+        .class { color: red; }
+      </style>
+      <script>
+        /* JavaScript Comment */
+        var x = 1;
+      </script>
+    </div>
+    """
+    cleaned_html = backend._remove_comments(html_with_comments)  # pylint: disable=W0212
+
+    assert "<!--" not in cleaned_html
+    assert "-->" not in cleaned_html
+    assert "/*" not in cleaned_html
+    assert "*/" not in cleaned_html
+    assert "HTML Comment" not in cleaned_html
+    assert "CSS Comment" not in cleaned_html
+    assert "JavaScript Comment" not in cleaned_html
