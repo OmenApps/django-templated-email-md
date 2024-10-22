@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+uv run --prerelease=allow python manage.py migrate --noinput --skip-checks
+uv run --prerelease=allow python manage.py runserver 0.0.0.0:8111 --skip-checks

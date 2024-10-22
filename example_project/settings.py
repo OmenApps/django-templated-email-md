@@ -128,6 +128,7 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Templated Email and Templated Email Markdown settings
+# https://django-templated-email-md.readthedocs.io/en/latest/
 TEMPLATED_EMAIL_BACKEND = "templated_email_md.backend.MarkdownTemplateBackend"
 TEMPLATED_EMAIL_BASE_HTML_TEMPLATE = "templated_email/markdown_base.html"
 TEMPLATED_EMAIL_FILE_EXTENSION = "md"
@@ -137,6 +138,7 @@ TEMPLATED_EMAIL_EMAIL_MESSAGE_CLASS = "anymail.message.AnymailMessage"
 TEMPLATED_EMAIL_EMAIL_MULTIALTERNATIVES_CLASS = "anymail.message.AnymailMessage"
 
 # Anymail settings
+# https://anymail.dev/en/stable/
 ANYMAIL = {
     "MAILGUN_API_KEY": env("MAILGUN_API_KEY", default="key-1234567890abcdef1234567890abcdef"),
     "MAILGUN_SENDER_DOMAIN": env("MAILGUN_SENDER_DOMAIN", default="example.com"),

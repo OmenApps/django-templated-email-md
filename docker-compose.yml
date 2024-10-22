@@ -1,0 +1,13 @@
+services:
+  django_test:
+    build:
+      context: .
+      dockerfile: ./compose/django/Dockerfile
+    image: django_templated_email_md
+    container_name: django_test
+
+    env_file:
+      - ./compose/django/.django
+    ports:
+      - "8111:8111"
+    command: /start

@@ -24,7 +24,7 @@ jobs:
         run: sleep 10
 
       - name: "Run tests"
-        run: docker compose exec django_test uv run --prerelease=allow nox -r --force-color
+        run: docker compose exec django_templated_email_md uv run --prerelease=allow nox -r --force-color
 
       - name: Upload documentation
         uses: actions/upload-artifact@v4
@@ -34,12 +34,12 @@ jobs:
 
       - name: Combine coverage data and display human readable report
         run: |
-          docker compose exec django_test uv run --prerelease=allow nox --session "coverage(django='5.0')"
+          docker compose exec django_templated_email_md uv run --prerelease=allow nox --session "coverage(django='5.0')"
 
       - name: Create coverage report and copy to artifacts
         run: |
-          docker compose exec django_test uv run --prerelease=allow nox --session "coverage(django='5.0')" -- xml
-          docker compose exec django_test cat coverage.xml > coverage.xml
+          docker compose exec django_templated_email_md uv run --prerelease=allow nox --session "coverage(django='5.0')" -- xml
+          docker compose exec django_templated_email_md cat coverage.xml > coverage.xml
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v4
