@@ -108,7 +108,7 @@ You can use Django's template language within your Markdown templates to make ea
 
 ## Sending Emails
 
-Use the `send_templated_mail` function from `django-templated-email` to send emails using your Markdown templates:
+Use the [`send_templated_mail`](https://github.com/vintasoftware/django-templated-email/?tab=readme-ov-file#sending-templated-emails) function from `django-templated-email` to send emails using your Markdown templates:
 
 ```python
 from templated_email import send_templated_mail
@@ -423,6 +423,7 @@ TEMPLATED_EMAIL_HTML2TEXT_SETTINGS = {
     'mark_code': True,
     'wrap_links': True,
 }
+```
 
 ### Error Handling
 
