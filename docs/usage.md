@@ -71,24 +71,28 @@ Place your Markdown email templates in the `templated_email/` directory within y
 
 ### Example Template: `templated_email/welcome.md`
 
-```markdown
-{% block subject %}Welcome to Our Service{% endblock %}
+*Note: The subject and preheader can be provided as template blocks or as context arguments when sending email.*
 
-{% block preheader %}Thanks for signing up!{% endblock %}
+```markdown
+{% load i18n %}
+
+{% block subject %}{% trans "Welcome to Our Service" %}{% endblock %}
+
+{% block preheader %}{% trans "Thanks for signing up!" %}{% endblock %}
 
 {% block content %}
-# Welcome, {{ user.first_name }}!
+# {% trans "Welcome" %}, {{ user.first_name }}!
 
-We're thrilled to have you join our service. Here are a few things you can do to get started:
+{% trans "We're thrilled to have you join our service. Here are a few things you can do to get started:" %}
 
-1. **Complete your profile**
-2. **Explore our features**
-3. **Connect with other users**
+1. **{% trans "Complete your profile" %}**
+2. **{% trans "Explore our features" %}**
+3. **{% trans "Connect with other users" %}**
 
-If you have any questions, don't hesitate to reach out to our support team.
+{% trans "If you have any questions, don't hesitate to reach out to our support team." %}
 
-Best regards,
-The Team
+{% trans "Best regards," %}
+{% trans "The Team" %}
 {% endblock %}
 ```
 
@@ -137,7 +141,7 @@ This allows you to define the overall structure and style of your emails.
 #### Example: `templated_email/markdown_base.html`
 
 ```html
-{% load i18n %}<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -227,6 +231,127 @@ Your username is: **{{ user.username|lower }}**
 {% endblock %}
 ```
 
+### Internationalization (i18n) and Translated Emails
+
+To send emails in different languages using internationalization (i18n), you need to:
+
+1. **Use Translation Tags in Templates**: Wrap translatable text in `trans` or `blocktrans` tags.
+2. **Set Up Translation Files**: Generate and compile message files for each language.
+3. **Activate the Desired Language**: Use `translation.override(language_code)` when sending the email.
+4. **Ensure Thread Safety with Celery**: Activate the language within the task function if using asynchronous tasks.
+
+#### 1. Use Translation Tags in Your Templates
+
+Include the `{% load i18n %}` tag and wrap text for translation.
+
+```markdown
+{% load i18n %}
+
+{% block subject %}{% trans "Welcome to Our Service" %}{% endblock %}
+
+{% block preheader %}{% trans "Thanks for signing up!" %}{% endblock %}
+
+{% block content %}
+# {% trans "Welcome" %}, {{ user.first_name }}!
+
+{% trans "We're thrilled to have you join our service. Here are a few things you can do to get started:" %}
+
+1. **{% trans "Complete your profile" %}**
+2. **{% trans "Explore our features" %}**
+3. **{% trans "Connect with other users" %}**
+
+{% trans "If you have any questions, don't hesitate to reach out to our support team." %}
+
+{% trans "Best regards," %}
+{% trans "The Team" %}
+{% endblock %}
+```
+
+#### 2. Set Up and Compile Translation Files
+
+Use Django's `makemessages` and `compilemessages` commands.
+
+*Note, to include the ".md" files, you may need to add the `--extension md` or `-e md` flag.*
+
+```bash
+# For Spanish translations of Markdown files
+django-admin makemessages -l es -e md
+# After translating the strings in locale/es/LC_MESSAGES/django.po
+django-admin compilemessages
+```
+
+#### 3. Activate the Desired Language When Sending the Email
+
+Use `translation.override(language_code)` to temporarily set the language.
+
+```python
+from templated_email import send_templated_mail
+from django.utils import translation
+
+def send_translated_email(user):
+    # Assume user.preferred_language contains the language code, e.g., 'es' for Spanish
+    language_code = user.preferred_language
+
+    # Activate the desired language
+    with translation.override(language_code):
+        send_templated_mail(
+            template_name='welcome',
+            from_email='from@example.com',
+            recipient_list=[user.email],
+            context={
+                'user': user,
+                # Add other context variables as needed
+            },
+        )
+```
+
+#### 4. Using Celery for Asynchronous Email Sending
+
+When sending emails asynchronously with Celery, activate the language within the task function to ensure thread safety.
+
+```python
+from celery import shared_task
+from templated_email import send_templated_mail
+from django.utils import translation
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+@shared_task
+def send_translated_email_task(user_id):
+    user = User.objects.get(id=user_id)
+    language_code = user.preferred_language
+
+    with translation.override(language_code):
+        send_templated_mail(
+            template_name='welcome',
+            from_email='from@example.com',
+            recipient_list=[user.email],
+            context={
+                'user': user,
+            },
+        )
+```
+
+#### 5. Handle Fallback Languages
+
+Optionally, provide a default language if the user's preferred language is not supported.
+
+```python
+supported_languages = ['en', 'es', 'fr']  # List of supported language codes
+language_code = user.preferred_language if user.preferred_language in supported_languages else 'en'
+
+with translation.override(language_code):
+    # Send email as before
+```
+
+#### Additional Considerations
+
+- **Load the `i18n` Template Tag Library**: Include `{% load i18n %}` at the top of your templates.
+- **Use `blocktrans` for Blocks of Text**: Use `{% blocktrans %}` when translating longer blocks that may include variables.
+- **Keep Translations Updated**: Whenever you change text in your templates or code, regenerate and recompile your message files.
+- **Provide Translations for All Strings**: Ensure all strings in templates and code are marked for translation.
+
 ## Edge Cases and Considerations
 
 ### Subject Overriding
@@ -266,6 +391,38 @@ TEMPLATED_EMAIL_MARKDOWN_EXTENSIONS = [
     'markdown.extensions.codehilite',
 ]
 ```
+
+### Customizing Plain Text Generation
+
+The `MarkdownTemplateBackend` uses `html2text` to automatically generate the plain text version of your emails from the HTML content. By default, certain configurations are set to produce a clean plain text output. However, you can override these settings to fit your specific needs.
+
+#### **Available `html2text` Settings**
+
+You can customize the behavior of `html2text` by specifying settings in your `settings.py` file using the `TEMPLATED_EMAIL_HTML2TEXT_SETTINGS` dictionary. Some common settings include:
+
+- `ignore_links`: If `True`, links will not be included in the plain text.
+- `ignore_images`: If `True`, image descriptions will be ignored.
+- `body_width`: Sets the maximum width of the text before wrapping.
+- `ignore_emphasis`: If `True`, emphasis markers (`*`, `**`) will be ignored.
+- `mark_code`: If `True`, code blocks will be wrapped with backticks.
+- `wrap_links`: If `True`, URLs will be wrapped in angle brackets (`<`, `>`).
+- `use_automatic_links`: If `True`, links will be converted to a simpler format.
+
+For a full list of settings, refer to the [html2text documentation](https://github.com/Alir3z4/html2text/blob/master/docs/usage.md#available-options). For any setting you want to configure, use the lowercase version of the setting name as the key in the `TEMPLATED_EMAIL_HTML2TEXT_SETTINGS` dictionary.
+
+#### **Example `html2text` Configuration**
+
+```python
+# settings.py
+
+TEMPLATED_EMAIL_HTML2TEXT_SETTINGS = {
+    'ignore_links': True,
+    'ignore_images': False,
+    'body_width': 80,
+    'ignore_emphasis': False,
+    'mark_code': True,
+    'wrap_links': True,
+}
 
 ### Error Handling
 

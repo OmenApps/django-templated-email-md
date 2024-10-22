@@ -119,6 +119,8 @@ send_templated_mail(
 )
 ```
 
+More detailed information can be found in the [usage guide][usage guide].
+
 ## Documentation
 
 For more detailed information, please refer to the [full documentation][read the docs].
@@ -148,6 +150,7 @@ This project was generated from [@OmenApps]'s [Cookiecutter Django Package] temp
 [pypi]: https://pypi.org/
 [license]: https://github.com/OmenApps/django-templated-email-md/blob/main/LICENSE
 [read the docs]: https://django-templated-email-md.readthedocs.io/
+[usage guide]: https://django-templated-email-md.readthedocs.io/en/latest/usage.html
 [contributor guide]: https://github.com/OmenApps/django-templated-email-md/blob/main/CONTRIBUTING.md
 [file an issue]: https://github.com/OmenApps/django-templated-email-md/issues
 [cookiecutter django package]: https://github.com/OmenApps/cookiecutter-django-package
