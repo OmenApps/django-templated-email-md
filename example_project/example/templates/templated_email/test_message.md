@@ -1,6 +1,6 @@
 {% block subject %}Test Email{% endblock %}
 
-# Hello {{ name }}!
+{% block content %}# Hello {{ name }}!
 
 This is a **bold** test.
 
@@ -8,3 +8,4 @@ This is a **bold** test.
 2. Item two
 
 [A link](http://example.com)
+{% endblock %}
