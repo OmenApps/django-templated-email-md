@@ -81,23 +81,32 @@ TEMPLATED_EMAIL_MARKDOWN_EXTENSIONS = [
 Place your Markdown email templates in the `templated_email/` directory within your project's templates directory. For example, create a file `templated_email/welcome.md`:
 
 ```markdown
-{% block subject %}Welcome to Our Service{% endblock %}
-
+{% block subject %}Test Email{% endblock %}
 {% block preheader %}Thanks for signing up!{% endblock %}
 
 {% block content %}
-# Welcome, {{ user.first_name }}!
+# {{ user.first_name }}, you're in!
 
-We're thrilled to have you join our service. Here are a few things you can do to get started:
+![Gorgeous, golden potato, Spedona, CC BY-SA 3.0 https://creativecommons.org/licenses/by-sa/3.0, via Wikimedia Commons](https://upload.wikimedia.org/wikipedia/commons/a/a4/Icone_pdt.png)
 
-1. **Complete your profile**
-2. **Explore our features**
-3. **Connect with other users**
+## Welcome to The Potato Shop
 
-If you have any questions, don't hesitate to reach out to our support team.
+### Hello {{ user.fiest_name }}! 👋
+
+> You have been invited to set up an account at the Potato shop on behalf of  **{{ inviter.name }}**.
+
+Please click [this link]({% url 'invitations:accept-invite' key=invitation.key %}) to establish your account.
+
+{% blocktranslate %}You will be directed to the 'set password' tool, where you can establish your account password.{% endblocktranslate %}
+
+---
 
 Best regards,
-The Team
+
+*Jack Linke*
+Potato Shop, LLC - Managing Director
+
+*Semi-round, Starchy Veggies for All*
 {% endblock %}
 ```
 
@@ -110,14 +119,18 @@ from templated_email import send_templated_mail
 
 send_templated_mail(
     template_name='welcome',
-    from_email='from@example.com',
-    recipient_list=['to@example.com'],
+    from_email='Potato Shop Support <support@mashedupyum.com>',
+    recipient_list=['terrence3725fries@wannamashitup.com'],
     context={
-        'user': user_instance,
-        # Add other context variables as needed
+        'user': request.user,
+        'inviter': inviter,
     },
 )
 ```
+
+### The Result
+
+![Email Preview](https://raw.githubusercontent.com/OmenApps/django-templated-email-md/0495a02b8f4a6affebefb3c2e89562c553851b17/docs/_static/email_screenshot.png)
 
 More detailed information can be found in the [usage guide][usage guide].
 
