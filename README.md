@@ -130,6 +130,12 @@ send_templated_mail(
 
 ### The Result
 
+#### Inbox Preview
+
+![Inbox Preview](https://raw.githubusercontent.com/OmenApps/django-templated-email-md/refs/heads/main/docs/_static/inbox_screenshot.png)
+
+#### Email Preview
+
 ![Email Preview](https://raw.githubusercontent.com/OmenApps/django-templated-email-md/0495a02b8f4a6affebefb3c2e89562c553851b17/docs/_static/email_screenshot.png)
 
 More detailed information can be found in the [usage guide][usage guide].
