@@ -354,6 +354,23 @@ with translation.override(language_code):
 
 ## Edge Cases and Considerations
 
+### Default Subject and Preheader
+
+- **Providing Defaults**: If the `subject` and `preheader` blocks are not defined in the template, the default values are used.
+- **Customizing Defaults**: You can set default values for the subject and preheader in the context when sending the email.
+
+#### Settings
+
+You can also set default values for the subject and preheader in your Django settings. These are used if a value is not provided
+in the template or context, or if you have set `fail_silently` to `True` and an error occurs.
+
+```python
+TEMPLATED_EMAIL_DEFAULT_SUBJECT = 'Default Subject'
+TEMPLATED_EMAIL_DEFAULT_PREHEADER = 'Default Preheader'
+```
+
+If not set, the default value for subject is `'Hello!'` and for preheader is `''`.
+
 ### Subject Overriding
 
 - **From Context**: You can override the subject by providing a `subject` key in the context.

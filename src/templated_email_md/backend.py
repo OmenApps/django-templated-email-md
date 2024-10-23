@@ -73,6 +73,8 @@ class MarkdownTemplateBackend(TemplateBackend):
             ],
         )
         self.html2text_settings = getattr(settings, "TEMPLATED_EMAIL_HTML2TEXT_SETTINGS", {})
+        self.default_subject = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_SUBJECT", _("Hello!"))
+        self.default_preheader = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_PREHEADER", _(""))
 
     def _render_markdown(self, content: str) -> str:
         """Convert Markdown content to HTML.
@@ -241,8 +243,8 @@ class MarkdownTemplateBackend(TemplateBackend):
                 return {
                     "html": fallback_content,
                     "plain": fallback_content,
-                    "subject": _("No Subject"),
-                    "preheader": _("No Preheader"),
+                    "subject": self.default_subject,
+                    "preheader": self.default_preheader,
                 }
             raise
 
@@ -259,7 +261,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         try:
             subject = render_block_to_string(template_path, "subject", context).strip()
         except BlockNotFound:
-            subject = _("No Subject")
+            subject = self.default_subject
 
         # Override subject if 'subject' is in context
         subject = context.get("subject", subject)
@@ -279,7 +281,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         try:
             preheader = render_block_to_string(template_path, "preheader", context).strip()
         except BlockNotFound:
-            preheader = _("No Preheader")
+            preheader = self.default_preheader
 
         # Override preheader if 'preheader' is in context
         preheader = context.get("preheader", preheader)

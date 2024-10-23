@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core import mail
 from django.template import TemplateDoesNotExist
 from django.utils import translation
+from django.utils.translation import gettext as _
 from templated_email import send_templated_mail
 
 from templated_email_md.backend import MarkdownTemplateBackend
@@ -137,7 +138,7 @@ def test_fail_silently():
     # Should get a fallback response instead of an exception
     assert "Email template rendering failed" in response["html"]
     assert "Email template rendering failed" in response["plain"]
-    assert response["subject"] == "No Subject"
+    assert response["subject"] == "Hello!"
 
 
 def test_subject_from_context(backend):
@@ -379,3 +380,79 @@ def test_remove_comments():
     assert "HTML Comment" not in cleaned_html
     assert "CSS Comment" not in cleaned_html
     assert "JavaScript Comment" not in cleaned_html
+
+
+def test_default_subject_and_preheader():
+    """
+    Test that the default subject and preheader are used when
+    not provided in the template or context.
+    """
+    # Send an email without subject or preheader in template or context
+    send_templated_mail(
+        template_name="test_no_subject_preheader",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={"name": "Test User"},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    # Default subject should be 'Hello!' as per the default in the backend
+    assert email.subject == _("Hello!")
+    # Preheader should be empty string by default
+    # Since preheader may not be directly visible, check in the HTML content
+    html_content = email.alternatives[0][0]
+    assert "Hello!" in email.subject
+    assert '<span class="preheader"' in html_content
+    # Assuming the preheader is included even if empty, check that it's empty
+    assert "></span>" in html_content
+
+
+def test_custom_default_subject_and_preheader():
+    """
+    Test that the custom default subject and preheader from settings
+    are used when not provided in the template or context.
+    """
+    settings.TEMPLATED_EMAIL_DEFAULT_SUBJECT = "Default Subject from Settings"
+    settings.TEMPLATED_EMAIL_DEFAULT_PREHEADER = "Default Preheader from Settings"
+    # Send an email without subject or preheader in template or context
+    send_templated_mail(
+        template_name="test_no_subject_preheader",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={"name": "Test User"},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    # Subject should be the custom default from settings
+    assert email.subject == "Default Subject from Settings"
+    # Preheader should be the custom default from settings
+    html_content = email.alternatives[0][0]
+    assert '<span class="preheader"' in html_content
+    assert ">Default Preheader from Settings</span>" in html_content
+
+
+def test_subject_and_preheader_provided():
+    """
+    Test that when subject and preheader are provided in the template,
+    they override the default values.
+    """
+    # Send an email with subject and preheader in the template
+    send_templated_mail(
+        template_name="test_subject_preheader_provided",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={"name": "Test User"},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    # Subject and preheader should be as provided in the template
+    assert email.subject == "Subject from Template"
+    html_content = email.alternatives[0][0]
+    assert '<span class="preheader"' in html_content
+    assert ">Preheader from Template</span>" in html_content
