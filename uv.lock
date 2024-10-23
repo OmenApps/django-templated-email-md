@@ -527,7 +527,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/20/53/b83f08603fbaa8a6a
 
 [[package]]
 name = "django-templated-email-md"
-version = "2024.10.2"
+version = "2024.10.4"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

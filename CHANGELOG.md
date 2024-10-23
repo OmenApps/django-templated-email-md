@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2024.10.4]
+
+- Improve README with screenshot example.
+- Add the ability to set default values for subject and preheader in the settings.
+- Fix more issues with files not being included in the package.
+
 ## [2024.10.3]
 
 - Fix issue with files not being included in the package.
