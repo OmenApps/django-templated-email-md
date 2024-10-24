@@ -164,7 +164,7 @@ class MarkdownTemplateBackend(TemplateBackend):
             return premailer.transform(
                 html=html,
                 strip_important=False,
-                keep_style_tags=True,
+                keep_style_tags=False,
                 cssutils_logging_level=logging.ERROR,
                 base_url=self.base_url if hasattr(self, "base_url") else "",
             )
@@ -175,7 +175,16 @@ class MarkdownTemplateBackend(TemplateBackend):
             raise CSSInliningError(f"Failed to inline CSS: {e}") from e
 
     def _get_template_path(self, template_name: str, template_dir: Optional[str], file_extension: Optional[str]) -> str:
-        """Construct the full template path."""
+        """Construct the full template path.
+
+        Args:
+            template_name: The name of the template
+            template_dir: The directory to look for the template in
+            file_extension: The file extension of the template file
+
+        Returns:
+            The full path to the template
+        """
         extension = file_extension or self.template_suffix
         if extension.startswith("."):
             extension = extension[1:]
@@ -188,7 +197,15 @@ class MarkdownTemplateBackend(TemplateBackend):
         return template_path
 
     def _extract_blocks(self, template_content: str, context: Dict[str, Any]) -> Dict[str, str]:
-        """Extract and render template blocks."""
+        """Extract and render template blocks.
+
+        Args:
+            template_content: Content of the template
+            context: Context to render the template with
+
+        Returns:
+            Dictionary containing the rendered subject and content blocks
+        """
         blocks = {}
 
         # Find subject block
@@ -284,11 +301,11 @@ class MarkdownTemplateBackend(TemplateBackend):
             inlined_html = self._inline_css(rendered_html)
 
             # Remove comments from the final HTML message
-            rendered_html = self._remove_comments(rendered_html)
+            final_html = self._remove_comments(inlined_html)
 
-            plain_text = self._get_plain_text_content_from_template(html_content)
+            plain_text = self._get_plain_text_content_from_template(final_html)
 
-            return {"html": inlined_html, "plain": plain_text, "subject": subject, "preheader": preheader}
+            return {"html": final_html, "plain": plain_text, "subject": subject, "preheader": preheader}
 
         except Exception as e:
             logger.error("Failed to render email: %s", str(e))
@@ -395,7 +412,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         """
         try:
             html_content = self._render_markdown(content)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=W0718
             if self.fail_silently:
                 logger.error("Error rendering email: %s", e)
                 html_content = "Email template rendering failed."
@@ -419,7 +436,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         """
         try:
             plain_text = self._generate_plain_text(content)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=W0718
             if self.fail_silently:
                 logger.error("Error generating plain text: %s", e)
                 plain_text = "Email template rendering failed."
