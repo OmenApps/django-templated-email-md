@@ -12,6 +12,7 @@ maxdepth: 1
 ---
 
 usage
+settings
 terminology
 reference
 contributing
