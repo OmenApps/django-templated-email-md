@@ -3,6 +3,8 @@
 from django.contrib import admin
 from django.urls import path
 
+from example_project.example.views import index
+
 
 """
 The `urlpatterns` list routes URLs to views. For more information please see:
@@ -22,4 +24,5 @@ Examples:
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("<int:some_id>/", index, name="index"),
 ]

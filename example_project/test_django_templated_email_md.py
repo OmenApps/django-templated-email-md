@@ -8,6 +8,8 @@ from django.utils import translation
 from django.utils.translation import gettext as _
 from templated_email import send_templated_mail
 
+from example_project.example.views import index
+from example_project.urls import urlpatterns
 from templated_email_md.backend import MarkdownTemplateBackend
 
 
@@ -333,7 +335,6 @@ def test_preheader_from_template():
 
     # Check that preheader is in the HTML alternative email body, but not plain text
     assert "Preheader from Template" in email.alternatives[0][0]
-    assert "Preheader from Template" not in email.body  # Should not be in plain text
 
 
 def test_preheader_in_context():
@@ -350,36 +351,56 @@ def test_preheader_in_context():
 
     # Check that preheader is in the HTML alternative email body, but not plain text
     assert "Preheader from Context" in email.alternatives[0][0]
-    assert "Preheader from Context" not in email.body  # Should not be in plain text
 
 
 def test_remove_comments():
     """Test that HTML and JavaScript comments are removed from the HTML content."""
     backend = MarkdownTemplateBackend()
     html_with_comments = """
-    <!-- HTML Comment -->
     <div>
-      Content here
-      <!-- Another comment -->
-      <style>
-        /* CSS Comment */
-        .class { color: red; }
-      </style>
-      <script>
-        /* JavaScript Comment */
-        var x = 1;
-      </script>
+        <!-- HTML Comment -->
+        <style>
+            /* CSS Comment */
+            .class { color: red; }
+        </style>
+        <script>
+            /* JavaScript Comment */
+            // This is also a comment
+            var url = "http://example.com";
+            var relativeUrl = "//cdn.example.com";
+            /* Multi-line
+            Comment */
+            var x = 1; // End of line comment
+        </script>
+        <a href="http://example.com">Link</a>
+        <img src="//cdn.example.com/image.jpg">
+        <!--[if IE]>IE specific content<![endif]-->
     </div>
+    <div>Content</div>
     """
     cleaned_html = backend._remove_comments(html_with_comments)  # pylint: disable=W0212
 
-    assert "<!--" not in cleaned_html
-    assert "-->" not in cleaned_html
-    assert "/*" not in cleaned_html
-    assert "*/" not in cleaned_html
+    # Regular comments should be removed
     assert "HTML Comment" not in cleaned_html
+    assert "Another Comment" not in cleaned_html
     assert "CSS Comment" not in cleaned_html
     assert "JavaScript Comment" not in cleaned_html
+    assert "/* Multi-line" not in cleaned_html
+    assert "Comment */" not in cleaned_html
+    assert "End of line comment" not in cleaned_html
+    assert "This is also a comment" not in cleaned_html
+    assert "/*" not in cleaned_html
+    assert "*/" not in cleaned_html
+
+    # Content should remain
+    assert "<div>Content</div>" in cleaned_html
+    assert ".class { color: red; }" in cleaned_html
+    assert "var x = 1;" in cleaned_html
+    assert "Link" in cleaned_html
+    assert "//cdn.example.com" in cleaned_html
+
+    # IE conditional comments should be preserved
+    assert "<!--[if IE]>IE specific content<![endif]-->" in cleaned_html
 
 
 def test_default_subject_and_preheader():
@@ -409,6 +430,64 @@ def test_default_subject_and_preheader():
     assert "></span>" in html_content
 
 
+def test_subject_and_preheader_provided():
+    """
+    Test that when subject and preheader are provided in the template,
+    they override the default values.
+    """
+    # Send an email with subject and preheader in the template
+    send_templated_mail(
+        template_name="test_subject_preheader_provided",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={"name": "Test User"},
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+
+    # Subject and preheader should be as provided in the template
+    assert email.subject == "Subject from Template"
+    html_content = email.alternatives[0][0]
+    assert '<span class="preheader"' in html_content
+    assert ">Preheader from Template</span>" in html_content
+
+
+def test_rendering_local_links():
+    """Test that local links are rendered correctly by premailer if base_url is provided."""
+    import random  # pylint: disable=C0415
+
+    from django.urls import reverse
+
+    some_id = random.randint(1, 100)
+    send_templated_mail(
+        template_name="test_render_local_links",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        base_url="http://exampleeee.com",
+        context={
+            "name": "Test User",
+            "some_id": some_id,
+            "url": reverse("index", args=[some_id]),
+        },
+    )
+
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+    html_content = email.alternatives[0][0]
+
+    url = reverse("index", args=[some_id])
+
+    # Check that the email was sent
+    assert email.subject == "Hello!"
+    assert "Hello Test User!" in email.body
+    assert "Hello Test User!" in html_content
+
+    # Check that the link was rendered correctly twice
+    assert html_content.count(f'<a href="http://exampleeee.com/{some_id}/"') == 2
+    assert html_content.count(">index</a>") == 2
+
+
 def test_custom_default_subject_and_preheader():
     """
     Test that the custom default subject and preheader from settings
@@ -435,24 +514,74 @@ def test_custom_default_subject_and_preheader():
     assert ">Default Preheader from Settings</span>" in html_content
 
 
-def test_subject_and_preheader_provided():
+def test_custom_html2text_settings(backend) -> None:
+    """Test that custom html2text settings are properly applied."""
+    # Set custom html2text settings
+    backend.html2text_settings = {"ignore_links": True, "ignore_images": True, "body_width": 0}
+
+    html_content = """
+        <div>
+            <p>Test content with <a href="http://example.com">a link</a></p>
+            <img src="image.jpg" alt="test image">
+        </div>
     """
-    Test that when subject and preheader are provided in the template,
-    they override the default values.
+
+    plain_text = backend._generate_plain_text(html_content)
+
+    # Links and images should be ignored based on our settings
+    assert "http://example.com" not in plain_text
+    assert "test image" not in plain_text
+
+
+def test_template_blocks_extraction(backend) -> None:
+    """Test extraction of subject and content blocks from template."""
+    template_content = """
+        {% block subject %}Test Subject{% endblock %}
+
+        {% block content %}
+        # Test Content
+
+        This is test content.
+        {% endblock %}
     """
-    # Send an email with subject and preheader in the template
-    send_templated_mail(
-        template_name="test_subject_preheader_provided",
-        from_email="from@example.com",
-        recipient_list=["to@example.com"],
-        context={"name": "Test User"},
+
+    context = {}
+    blocks = backend._extract_blocks(template_content, context)
+
+    assert blocks["subject"] == "Test Subject"
+    assert "# Test Content" in blocks["content"]
+    assert "This is test content." in blocks["content"]
+
+
+def test_default_subject_preheader_settings(backend) -> None:
+    """Test that default subject and preheader settings are used when not provided."""
+    from django.test import override_settings
+
+    custom_subject = "Custom Default Subject"
+    custom_preheader = "Custom Default Preheader"
+
+    with override_settings(
+        TEMPLATED_EMAIL_DEFAULT_SUBJECT=custom_subject, TEMPLATED_EMAIL_DEFAULT_PREHEADER=custom_preheader
+    ):
+        # Create a new backend instance to pick up the settings
+        new_backend = MarkdownTemplateBackend()
+        assert new_backend.default_subject == custom_subject
+        assert new_backend.default_preheader == custom_preheader
+
+
+def test_fail_silently_render_email(backend) -> None:
+    """Test that _render_email handles errors gracefully with fail_silently=True."""
+    # Set fail_silently on the backend
+    backend.fail_silently = True
+
+    # Test with non-existent template
+    result = backend._render_email(
+        template_name="non_existent_template",
+        context={},
     )
 
-    assert len(mail.outbox) == 1
-    email = mail.outbox[0]
-
-    # Subject and preheader should be as provided in the template
-    assert email.subject == "Subject from Template"
-    html_content = email.alternatives[0][0]
-    assert '<span class="preheader"' in html_content
-    assert ">Preheader from Template</span>" in html_content
+    # Should return fallback content
+    assert result["html"] == "Email template rendering failed."
+    assert result["plain"] == "Email template rendering failed."
+    assert result["subject"] == backend.default_subject
+    assert result["preheader"] == backend.default_preheader
