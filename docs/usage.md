@@ -138,6 +138,11 @@ send_templated_mail(
 While we recommend you stick with the provided base template, you can create a custom base HTML template to wrap your Markdown content.
 This allows you to define the overall structure and style of your emails.
 
+There are two ways to achieve this:
+
+1. **Template Overrides**: Within the `templates/` directory in your project's base directory, create a `templated_email/` directory. Then add a `markdown_base.html` file to serve as the base template. This will override the default base template from the package.
+2. **Custom Base Template**: Place your custom base HTML template elsewhere and update the `TEMPLATED_EMAIL_BASE_HTML_TEMPLATE` setting to point to it.
+
 #### Example: `templated_email/markdown_base.html`
 
 ```html
@@ -158,7 +163,7 @@ This allows you to define the overall structure and style of your emails.
 </html>
 ```
 
-Update the `TEMPLATED_EMAIL_BASE_HTML_TEMPLATE` setting if you use a custom template:
+Update the `TEMPLATED_EMAIL_BASE_HTML_TEMPLATE` setting if you use a custom template in a different location:
 
 ```python
 TEMPLATED_EMAIL_BASE_HTML_TEMPLATE = 'templated_email/markdown_base.html'
