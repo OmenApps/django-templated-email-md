@@ -427,10 +427,35 @@ class MarkdownTemplateBackend(TemplateBackend):
                 raise
         return plain_text
 
+    def _remove_multiline_comments(self, html: str) -> str:
+        """Remove multi-line JavaScript and CSS comments."""
+        return re.sub(r"/\*[\s\S]*?\*/", "", html)
+
+    def _remove_singleline_comments(self, html: str) -> str:
+        """Remove single-line JavaScript and CSS comments while preserving URLs."""
+        # Pattern to match // comments not preceded by :, ", ', or =
+        pattern = r'(?<!:)(?<!")(?<!\')(?<!=)//.*?$'
+        return re.sub(pattern, "", html, flags=re.MULTILINE)
+
+    def _remove_html_comments(self, html: str) -> str:
+        """Remove HTML comments but preserve IE conditional comments."""
+        return re.sub(r"<!--(?!\[if).*?-->", "", html, flags=re.DOTALL)
+
+    def _clean_extra_blank_lines(self, html: str) -> str:
+        """Remove extra blank lines created by comment removal."""
+        return re.sub(r"\n\s*\n", "\n", html)
+
     def _remove_comments(self, html: str) -> str:
-        """Remove HTML comments and JavaScript/CSS comments from the HTML content."""
-        # Remove HTML comments (excluding conditional comments for Outlook)
-        html = re.sub(r"<!--(?!\[if).*?-->", "", html, flags=re.DOTALL)
-        # Remove JavaScript and CSS comments
-        html = re.sub(r"/\*.*?\*/", "", html, flags=re.DOTALL)
+        """Remove HTML, JavaScript, and CSS comments from HTML content while retaining URLs and IE-specific comments.
+
+        Args:
+            html (str): The HTML content containing comments.
+
+        Returns:
+            str: HTML content with comments removed.
+        """
+        html = self._remove_multiline_comments(html)
+        html = self._remove_singleline_comments(html)
+        html = self._remove_html_comments(html)
+        html = self._clean_extra_blank_lines(html)
         return html
