@@ -395,6 +395,83 @@ send_templated_mail(
 )
 ```
 
+### URL Template Tags and Relative URLs
+
+In order to include URLs in your emails, you can use Django's URL template tags or pass the URL as a context variable.
+
+In either case, to transform relative URLs into absolute URLs, you can set the `TEMPLATED_EMAIL_BASE_URL` setting in your Django
+settings, or for more flexibility, you can add a `base_url` argument to the `send_templated_mail` function. This will be used to
+prepend relative URLs in your email templates.
+
+#### Example
+
+```python
+send_templated_mail(
+    template_name='welcome',
+    from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context={
+            "user": user_instance,
+        },
+        base_url="http://example.com",
+    )
+```
+
+### Code and code blocks
+
+When working with templates that include code snippets that should be rendered verbatim in the resulting email combined with Django template tags, the Django template engine will attempt to interpret and render these tags, which can lead to errors or unintended behavior.
+
+This section applies to all of the following examples:
+
+```markdown
+    <code>{% url %}</code>
+
+    <code>{{ url }}</code>
+
+    `{% url %}`
+
+    `{{ url }}`
+
+    ```html
+    {% url %}
+    ```
+
+    ```html
+    {{ url }}
+    ```
+```
+
+To prevent django-templated-email-md from processing the content inside code blocks, you can wrap the relevant content with Django's built-in [`{% verbatim %}` template tag](https://docs.djangoproject.com/en/5.1/ref/templates/builtins/#verbatim).
+
+#### Example
+
+```markdown
+{% block content %}
+    Here is some code:
+
+    {% verbatim %}
+    <code>{% url %}</code>
+    {% endverbatim %}
+
+    Another code snippet:
+
+    {% verbatim %}
+    `{{ url }}`
+    {% endverbatim %}
+
+    And a code block:
+
+    {% verbatim %}
+    ```python
+    {{ url }
+    ```
+    {% endverbatim %}
+
+    More content here.
+{% endblock %}
+```
+
+
 ### Context Variables
 
 - **Missing Variables**: If a variable used in the template is missing from the context, the email rendering will fail unless `fail_silently` is set to `True`.
