@@ -76,6 +76,58 @@ class MarkdownTemplateBackend(TemplateBackend):
         self.default_subject = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_SUBJECT", _("Hello!"))
         self.default_preheader = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_PREHEADER", _(""))
 
+    def send(
+        self,
+        template_name,
+        from_email,
+        recipient_list,
+        context,
+        cc=None,
+        bcc=None,
+        fail_silently=False,
+        headers=None,
+        template_prefix=None,
+        template_suffix=None,
+        template_dir=None,
+        file_extension=None,
+        auth_user=None,
+        auth_password=None,
+        connection=None,
+        attachments=None,
+        create_link=False,
+        **kwargs,
+    ):
+        """Send an email using the Markdown template.
+
+        Overrides the send method to add support for a base URL, used by premailer to resolve relative URLs.
+        """
+
+        # Extract base_url from kwargs if provided
+        self.base_url = kwargs.pop(  # pylint: disable=W0201
+            "base_url", getattr(settings, "TEMPLATED_EMAIL_BASE_URL", "")
+        )
+
+        return super().send(
+            template_name,
+            from_email,
+            recipient_list,
+            context,
+            cc=cc,
+            bcc=bcc,
+            fail_silently=fail_silently,
+            headers=headers,
+            template_prefix=template_prefix,
+            template_suffix=template_suffix,
+            template_dir=template_dir,
+            file_extension=file_extension,
+            auth_user=auth_user,
+            auth_password=auth_password,
+            connection=connection,
+            attachments=attachments,
+            create_link=create_link,
+            **kwargs,
+        )
+
     def _render_markdown(self, content: str) -> str:
         """Convert Markdown content to HTML.
 
@@ -114,6 +166,7 @@ class MarkdownTemplateBackend(TemplateBackend):
                 strip_important=False,
                 keep_style_tags=True,
                 cssutils_logging_level=logging.ERROR,
+                base_url=self.base_url if hasattr(self, "base_url") else "",
             )
         except Exception as e:
             logger.error("Failed to inline CSS: %s", e)
