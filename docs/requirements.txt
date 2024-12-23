@@ -8,7 +8,7 @@ linkify-it-py==2.0.3
 
 # Django and related packages (for autodoc)
 Django==5.0.8
-click==8.1.7
+click==8.1.8
 markdown==3.7
 premailer==3.10.0
 html2text==2024.2.26
