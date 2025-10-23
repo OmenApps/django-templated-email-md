@@ -3,9 +3,6 @@
 import logging
 import re
 from typing import Any
-from typing import Dict
-from typing import Optional
-from typing import Union
 
 import html2text
 import markdown
@@ -36,8 +33,8 @@ class MarkdownTemplateBackend(TemplateBackend):
     def __init__(
         self,
         fail_silently: bool = False,
-        template_prefix: Optional[str] = None,
-        template_suffix: Optional[str] = None,
+        template_prefix: str | None = None,
+        template_suffix: str | None = None,
         **kwargs: Any,
     ):
         """Initialize the MarkdownTemplateBackend.
@@ -148,7 +145,7 @@ class MarkdownTemplateBackend(TemplateBackend):
                 return content  # Return raw content if conversion fails
             raise MarkdownRenderError(f"Failed to render Markdown: {e}") from e
 
-    def _inline_css(self, html: str) -> str:
+    def _inline_css(self, html: str, base_url: str = "") -> str:
         """Inline CSS styles in HTML content.
 
         Args:
@@ -174,7 +171,7 @@ class MarkdownTemplateBackend(TemplateBackend):
                 return html  # Return original HTML if inlining fails
             raise CSSInliningError(f"Failed to inline CSS: {e}") from e
 
-    def _get_template_path(self, template_name: str, template_dir: Optional[str], file_extension: Optional[str]) -> str:
+    def _get_template_path(self, template_name: str, template_dir: str | None, file_extension: str | None) -> str:
         """Construct the full template path.
 
         Args:
@@ -196,7 +193,7 @@ class MarkdownTemplateBackend(TemplateBackend):
 
         return template_path
 
-    def _extract_blocks(self, template_content: str, context: Dict[str, Any]) -> Dict[str, str]:
+    def _extract_blocks(self, template_content: str, context: dict[str, Any]) -> dict[str, str]:
         """Extract and render template blocks.
 
         Args:
@@ -252,11 +249,11 @@ class MarkdownTemplateBackend(TemplateBackend):
 
     def _render_email(
         self,
-        template_name: Union[str, list, tuple],
-        context: Dict[str, Any],
-        template_dir: Optional[str] = None,
-        file_extension: Optional[str] = None,
-    ) -> Dict[str, str]:
+        template_name: str | list | tuple,
+        context: dict[str, Any],
+        template_dir: str | None = None,
+        file_extension: str | None = None,
+    ) -> dict[str, str]:
         """Render the email content using the Markdown template and base HTML template.
 
         Args:
@@ -318,7 +315,7 @@ class MarkdownTemplateBackend(TemplateBackend):
                 }
             raise
 
-    def _get_subject_from_template(self, template_path: str, context: Dict[str, Any]) -> Optional[str]:
+    def _get_subject_from_template(self, template_path: str, context: dict[str, Any]) -> str | None:
         """Extract subject from template block.
 
         Args:
@@ -338,7 +335,7 @@ class MarkdownTemplateBackend(TemplateBackend):
 
         return subject
 
-    def _get_preheader_from_template(self, template_path: str, context: Dict[str, Any]) -> Optional[str]:
+    def _get_preheader_from_template(self, template_path: str, context: dict[str, Any]) -> str | None:
         """Extract preheader from template block.
 
         Args:
@@ -361,8 +358,8 @@ class MarkdownTemplateBackend(TemplateBackend):
     def _get_content_from_template(
         self,
         template_path: str,
-        context: Dict[str, Any],
-    ) -> Dict[str, str]:
+        context: dict[str, Any],
+    ) -> dict[str, str]:
         """Extract content from template block.
 
         Args:
