@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+
+## [2025.10.1]
+
+- Update minimum Python and Django versions
+- Modernize type hints
+- Optimize Docker Compose setup
+- Add support for base_url parameter
+- Make exception handling more specific
+- Improve test coverage
+- Add more examples to docs and correct mistakes
+
+## [2024.10.5]
+
+- Add another screenshot to README
+- Ensure relative urls can be modified to be full urls
+- Improve how html, css, and javascript comments are removed
+- Enhance and add tests
+- Cleanup code and improve comments
+- Improve docs section on overriding templates
+- Add docs sections on urls and verbatim code
+- Add a docs page documenting all settings
+
 ## [2024.10.4]
 
 - Improve README with screenshot example.
