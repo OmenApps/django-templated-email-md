@@ -74,6 +74,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         self.html2text_settings = getattr(settings, "TEMPLATED_EMAIL_HTML2TEXT_SETTINGS", {})
         self.default_subject = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_SUBJECT", _("Hello!"))
         self.default_preheader = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_PREHEADER", _(""))
+        self.base_url = getattr(settings, "TEMPLATED_EMAIL_BASE_URL", "")
 
     def send(
         self,
@@ -101,31 +102,42 @@ class MarkdownTemplateBackend(TemplateBackend):
         Overrides the send method to add support for a base URL, used by premailer to resolve relative URLs.
         """
 
-        # Extract base_url from kwargs if provided
-        self.base_url = kwargs.pop(  # pylint: disable=W0201
-            "base_url", getattr(settings, "TEMPLATED_EMAIL_BASE_URL", "")
-        )
+        # Extract base_url from kwargs if provided, fall back to default
+        base_url = kwargs.pop("base_url", self.base_url)
 
-        return super().send(
-            template_name,
-            from_email,
-            recipient_list,
-            context,
-            cc=cc,
-            bcc=bcc,
-            fail_silently=fail_silently,
-            headers=headers,
-            template_prefix=template_prefix,
-            template_suffix=template_suffix,
-            template_dir=template_dir,
-            file_extension=file_extension,
-            auth_user=auth_user,
-            auth_password=auth_password,
-            connection=connection,
-            attachments=attachments,
-            create_link=create_link,
-            **kwargs,
-        )
+        # Add base_url to context temporarily for use in _render_email
+        # Store original value if it exists to restore later
+        context_had_base_url = "_base_url" in context
+        original_base_url = context.get("_base_url")
+        context["_base_url"] = base_url
+
+        try:
+            return super().send(
+                template_name,
+                from_email,
+                recipient_list,
+                context,
+                cc=cc,
+                bcc=bcc,
+                fail_silently=fail_silently,
+                headers=headers,
+                template_prefix=template_prefix,
+                template_suffix=template_suffix,
+                template_dir=template_dir,
+                file_extension=file_extension,
+                auth_user=auth_user,
+                auth_password=auth_password,
+                connection=connection,
+                attachments=attachments,
+                create_link=create_link,
+                **kwargs,
+            )
+        finally:
+            # Clean up context
+            if context_had_base_url:
+                context["_base_url"] = original_base_url
+            else:
+                context.pop("_base_url", None)
 
     def _render_markdown(self, content: str) -> str:
         """Convert Markdown content to HTML.
@@ -152,6 +164,7 @@ class MarkdownTemplateBackend(TemplateBackend):
 
         Args:
             html: HTML content to process
+            base_url: Base URL for resolving relative URLs in CSS/images
 
         Returns:
             HTML with inlined CSS
@@ -165,7 +178,7 @@ class MarkdownTemplateBackend(TemplateBackend):
                 strip_important=False,
                 keep_style_tags=False,
                 cssutils_logging_level=logging.ERROR,
-                base_url=self.base_url if hasattr(self, "base_url") else "",
+                base_url=base_url,
             )
         except (OSError, ValueError, AttributeError, TypeError) as e:
             logger.error("Failed to inline CSS: %s", e)
@@ -269,6 +282,9 @@ class MarkdownTemplateBackend(TemplateBackend):
         """
         fallback_content = _("Email template rendering failed.")
 
+        # Extract base_url from context (set by send() method)
+        base_url = context.get("_base_url", self.base_url)
+
         try:
             template_path = self._get_template_path(
                 template_name if isinstance(template_name, str) else template_name[0], template_dir, file_extension
@@ -296,8 +312,8 @@ class MarkdownTemplateBackend(TemplateBackend):
             # Render base template
             rendered_html = base_template.render(base_context)
 
-            # Inline CSS
-            inlined_html = self._inline_css(rendered_html)
+            # Inline CSS with base_url for resolving relative URLs
+            inlined_html = self._inline_css(rendered_html, base_url=base_url)
 
             # Remove comments from the final HTML message
             final_html = self._remove_comments(inlined_html)
