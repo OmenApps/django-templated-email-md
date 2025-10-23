@@ -411,10 +411,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         """Render the email content using the Markdown template and base HTML template.
 
         Args:
-            template_name (str or list): The name of the Markdown template to render.
-            context (dict): The context to render the template with.
-            template_dir (str): The directory to look for the template in.
-            file_extension (str): The file extension of the template file.
+            content: Markdown content to convert
 
         Returns:
             Rendered HTML content.
@@ -437,7 +434,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         """Generate plain text content from HTML.
 
         Args:
-            html_content: HTML content to convert
+            content: HTML content to convert
 
         Returns:
             Plain text content without Markdown formatting
