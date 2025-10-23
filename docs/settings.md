@@ -108,7 +108,7 @@ TEMPLATED_EMAIL_DEFAULT_SUBJECT = 'Message from Our Company'
 ```python
 TEMPLATED_EMAIL_DEFAULT_PREHEADER = 'Important information from Our Company'
 ```
-- **Further Reading:** [Email Preheader Best Practices](https://www.litmus.com/blog/the-ultimate-guide-to-preview-text-support/) (refered to in this blocg as 'preview text')
+- **Further Reading:** [Email Preheader Best Practices](https://www.litmus.com/blog/the-ultimate-guide-to-preview-text-support/) (referred to in this blog as 'preview text')
 
 ## Plain Text Generation Settings
 

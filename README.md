@@ -36,6 +36,12 @@ You can install `django-templated-email-md` via [pip] from [PyPI]:
 pip install django-templated-email-md
 ```
 
+## Requirements
+
+- Python 3.11+
+- Django 4.2+
+- django-templated-email 3.0+
+
 ### Add to `INSTALLED_APPS`
 
 Add `templated_email_md` to your `INSTALLED_APPS` in `settings.py`:
@@ -73,7 +79,23 @@ TEMPLATED_EMAIL_MARKDOWN_EXTENSIONS = [
     'markdown.extensions.meta',
     'markdown.extensions.tables',
 ]
+
+# Optional: Base URL for resolving relative URLs in CSS/images
+TEMPLATED_EMAIL_BASE_URL = 'https://example.com'
+
+# Optional: Customize plain text generation
+TEMPLATED_EMAIL_HTML2TEXT_SETTINGS = {
+    'ignore_emphasis': True,
+    'body_width': 0,
+}
+
+# Optional: Fail silently on errors (default: False)
+TEMPLATED_EMAIL_FAIL_SILENTLY = False
 ```
+
+For a complete list of available settings, see the [settings documentation][settings docs].
+
+[settings docs]: https://django-templated-email-md.readthedocs.io/en/latest/settings.html
 
 ## Usage
 
@@ -92,7 +114,7 @@ Place your Markdown email templates in the `templated_email/` directory within y
 
 ## Welcome to The Potato Shop
 
-### Hello {{ user.fiest_name }}! 👋
+### Hello {{ user.first_name }}! 👋
 
 > You have been invited to set up an account at the Potato shop on behalf of  **{{ inviter.name }}**.
 
@@ -126,6 +148,20 @@ send_templated_mail(
         'user': request.user,
         'inviter': inviter,
     },
+)
+```
+
+You can also pass a `base_url` parameter for resolving relative URLs in CSS and images:
+
+```python
+send_templated_mail(
+    template_name='welcome',
+    from_email='support@example.com',
+    recipient_list=['user@example.com'],
+    context={
+        'user': request.user,
+    },
+    base_url='https://example.com',  # Optional: for CSS/image URLs
 )
 ```
 
