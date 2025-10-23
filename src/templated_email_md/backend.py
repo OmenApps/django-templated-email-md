@@ -10,6 +10,8 @@ import premailer
 from django.conf import settings
 from django.template import Context
 from django.template import Template
+from django.template import TemplateDoesNotExist
+from django.template import TemplateSyntaxError
 from django.template.loader import get_template
 from django.utils.translation import gettext as _
 from render_block import BlockNotFound
@@ -139,7 +141,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         """
         try:
             return markdown.markdown(content, extensions=self.markdown_extensions)
-        except Exception as e:
+        except (ValueError, AttributeError, ImportError, TypeError) as e:
             logger.error("Failed to render Markdown: %s", e)
             if self.fail_silently:
                 return content  # Return raw content if conversion fails
@@ -165,7 +167,7 @@ class MarkdownTemplateBackend(TemplateBackend):
                 cssutils_logging_level=logging.ERROR,
                 base_url=self.base_url if hasattr(self, "base_url") else "",
             )
-        except Exception as e:
+        except (OSError, ValueError, AttributeError, TypeError) as e:
             logger.error("Failed to inline CSS: %s", e)
             if self.fail_silently:
                 return html  # Return original HTML if inlining fails
@@ -304,7 +306,17 @@ class MarkdownTemplateBackend(TemplateBackend):
 
             return {"html": final_html, "plain": plain_text, "subject": subject, "preheader": preheader}
 
-        except Exception as e:
+        except (
+            TemplateDoesNotExist,
+            TemplateSyntaxError,
+            BlockNotFound,
+            MarkdownRenderError,
+            CSSInliningError,
+            ValueError,
+            AttributeError,
+            TypeError,
+            OSError,
+        ) as e:
             logger.error("Failed to render email: %s", str(e))
             if self.fail_silently:
                 return {
@@ -409,9 +421,8 @@ class MarkdownTemplateBackend(TemplateBackend):
         """
         try:
             html_content = self._render_markdown(content)
-        except Exception as e:  # pylint: disable=W0718
+        except MarkdownRenderError as e:
             if self.fail_silently:
-                logger.error("Error rendering email: %s", e)
                 html_content = "Email template rendering failed."
             else:
                 raise
@@ -433,9 +444,9 @@ class MarkdownTemplateBackend(TemplateBackend):
         """
         try:
             plain_text = self._generate_plain_text(content)
-        except Exception as e:  # pylint: disable=W0718
+        except (AttributeError, ValueError, TypeError) as e:
+            logger.error("Error generating plain text: %s", e)
             if self.fail_silently:
-                logger.error("Error generating plain text: %s", e)
                 plain_text = "Email template rendering failed."
             else:
                 raise
