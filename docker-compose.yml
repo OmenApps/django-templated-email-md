@@ -10,4 +10,12 @@ services:
       - ./compose/django/.django
     ports:
       - "8111:8111"
+    volumes:
+      # Mount source code for live reloading during development
+      - ./src:/app/src
+      - ./example_project:/app/example_project
+      - ./docs:/app/docs
+      - ./noxfile.py:/app/noxfile.py
+      - ./manage.py:/app/manage.py
+      - ./pyproject.toml:/app/pyproject.toml
     command: /start
