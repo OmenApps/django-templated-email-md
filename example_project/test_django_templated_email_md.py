@@ -585,3 +585,186 @@ def test_fail_silently_render_email(backend) -> None:
     assert result["plain"] == "Email template rendering failed."
     assert result["subject"] == backend.default_subject
     assert result["preheader"] == backend.default_preheader
+
+def test_fail_silently_none_initialization() -> None:
+    """Test that backend handles fail_silently=None during initialization."""
+    from django.test import override_settings
+
+    # When fail_silently is explicitly None, it should fall back to settings
+    backend_with_none = MarkdownTemplateBackend(fail_silently=None)
+
+    # Should use the default from settings (False in test settings)
+    assert backend_with_none.fail_silently is False
+
+    # Test with a setting override
+    with override_settings(TEMPLATED_EMAIL_FAIL_SILENTLY=True):
+        backend_with_setting = MarkdownTemplateBackend(fail_silently=None)
+        assert backend_with_setting.fail_silently is True
+
+
+def test_template_without_content_block(backend) -> None:
+    """Test rendering a template without explicit {% block content %}."""
+    result = backend._render_email(
+        template_name="test_no_content_block",
+        context={},
+    )
+
+    # Should extract content using fallback regex method
+    assert "Simple Markdown" in result["html"]
+    assert "<strong>Bold text</strong>" in result["html"]
+    assert "<em>italic text</em>" in result["html"]
+    # CSS inlining adds styles, so just check for content
+    assert "List item 1" in result["html"]
+    assert "List item 2" in result["html"]
+    
+    # Subject and preheader should still be extracted
+    assert result["subject"] == "Test Email Without Content Block"
+    assert result["preheader"] == "Test preheader"
+    
+    # Plain text should also work
+    assert "Simple Markdown" in result["plain"]
+    assert "Bold text" in result["plain"]
+
+
+def test_markdown_render_error_with_fail_silently() -> None:
+    """Test that MarkdownRenderError is caught when fail_silently=True."""
+    from unittest.mock import patch
+    from templated_email_md.exceptions import MarkdownRenderError
+    
+    backend = MarkdownTemplateBackend(fail_silently=True)
+    
+    # Mock markdown.markdown to raise an exception
+    with patch('templated_email_md.backend.markdown.markdown') as mock_markdown:
+        mock_markdown.side_effect = ValueError("Invalid markdown extension")
+        
+        # Should return the raw content instead of raising
+        result = backend._render_markdown("# Test content")
+        assert result == "# Test content"
+
+
+def test_markdown_render_error_without_fail_silently() -> None:
+    """Test that MarkdownRenderError is raised when fail_silently=False."""
+    from unittest.mock import patch
+    from templated_email_md.exceptions import MarkdownRenderError
+    
+    backend = MarkdownTemplateBackend(fail_silently=False)
+    
+    # Mock markdown.markdown to raise an exception
+    with patch('templated_email_md.backend.markdown.markdown') as mock_markdown:
+        mock_markdown.side_effect = ValueError("Invalid markdown extension")
+        
+        # Should raise MarkdownRenderError
+        with pytest.raises(MarkdownRenderError) as exc_info:
+            backend._render_markdown("# Test content")
+        
+        assert "Invalid markdown extension" in str(exc_info.value)
+
+
+def test_css_inlining_error_with_fail_silently() -> None:
+    """Test that CSSInliningError is caught when fail_silently=True."""
+    from unittest.mock import patch
+    from templated_email_md.exceptions import CSSInliningError
+    
+    backend = MarkdownTemplateBackend(fail_silently=True)
+    
+    # Mock premailer.transform to raise an exception
+    with patch('templated_email_md.backend.premailer.transform') as mock_premailer:
+        mock_premailer.side_effect = OSError("Network error fetching CSS")
+        
+        # Should return the original HTML instead of raising
+        test_html = "<p>Test content</p>"
+        result = backend._inline_css(test_html, base_url="http://example.com")
+        assert result == test_html
+
+
+def test_css_inlining_error_without_fail_silently() -> None:
+    """Test that CSSInliningError is raised when fail_silently=False."""
+    from unittest.mock import patch
+    from templated_email_md.exceptions import CSSInliningError
+    
+    backend = MarkdownTemplateBackend(fail_silently=False)
+    
+    # Mock premailer.transform to raise an exception
+    with patch('templated_email_md.backend.premailer.transform') as mock_premailer:
+        mock_premailer.side_effect = OSError("Network error fetching CSS")
+        
+        # Should raise CSSInliningError
+        with pytest.raises(CSSInliningError) as exc_info:
+            backend._inline_css("<p>Test content</p>", base_url="http://example.com")
+        
+        assert "Network error fetching CSS" in str(exc_info.value)
+
+
+def test_plain_text_generation_error_with_fail_silently() -> None:
+    """Test that plain text generation errors are caught when fail_silently=True."""
+    from unittest.mock import patch
+    
+    backend = MarkdownTemplateBackend(fail_silently=True)
+    
+    # Mock html2text to raise an exception
+    with patch('templated_email_md.backend.html2text.HTML2Text') as mock_html2text:
+        mock_instance = mock_html2text.return_value
+        mock_instance.handle.side_effect = AttributeError("Invalid HTML structure")
+        
+        # Should return fallback content instead of raising
+        result = backend._get_plain_text_content_from_template("<p>Test</p>")
+        assert result == "Email template rendering failed."
+
+
+def test_plain_text_generation_error_without_fail_silently() -> None:
+    """Test that plain text generation errors are raised when fail_silently=False."""
+    from unittest.mock import patch
+    
+    backend = MarkdownTemplateBackend(fail_silently=False)
+    
+    # Mock html2text to raise an exception
+    with patch('templated_email_md.backend.html2text.HTML2Text') as mock_html2text:
+        mock_instance = mock_html2text.return_value
+        mock_instance.handle.side_effect = AttributeError("Invalid HTML structure")
+        
+        # Should raise AttributeError
+        with pytest.raises(AttributeError) as exc_info:
+            backend._get_plain_text_content_from_template("<p>Test</p>")
+        
+        assert "Invalid HTML structure" in str(exc_info.value)
+
+
+def test_context_base_url_restoration(backend) -> None:
+    """Test that _base_url in context is properly restored after send()."""
+    from django.core import mail
+    
+    # Create context with a pre-existing _base_url
+    context = {
+        "name": "Test User",
+        "_base_url": "http://original-url.com",
+    }
+    
+    # Send email with a different base_url
+    backend.send(
+        template_name="test_message",
+        from_email="from@example.com",
+        recipient_list=["to@example.com"],
+        context=context,
+        base_url="http://new-url.com",
+    )
+    
+    # Context should be restored to original value
+    assert context["_base_url"] == "http://original-url.com"
+
+
+def test_markdown_import_error() -> None:
+    """Test handling of ImportError when markdown extension is not found."""
+    from unittest.mock import patch
+    from templated_email_md.exceptions import MarkdownRenderError
+    
+    backend = MarkdownTemplateBackend(fail_silently=False)
+    
+    # Mock markdown.markdown to raise ImportError
+    with patch('templated_email_md.backend.markdown.markdown') as mock_markdown:
+        mock_markdown.side_effect = ImportError("Extension 'invalid.extension' not found")
+        
+        # Should raise MarkdownRenderError
+        with pytest.raises(MarkdownRenderError) as exc_info:
+            backend._render_markdown("# Test content")
+        
+        assert "Extension 'invalid.extension' not found" in str(exc_info.value)
