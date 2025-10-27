@@ -612,7 +612,7 @@ wheels = [
 
 [[package]]
 name = "django-templated-email-md"
-version = "2025.10.1"
+version = "2025.10.2"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -659,13 +659,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "click", specifier = "~=8.1" },
+    { name = "click", specifier = ">=8.1" },
     { name = "django", specifier = ">=4.2.15" },
-    { name = "django-render-block", specifier = "~=0.8" },
-    { name = "django-templated-email", specifier = "~=3.0" },
-    { name = "html2text", specifier = "~=2024.2" },
-    { name = "markdown", specifier = "~=3.7" },
-    { name = "premailer", specifier = "~=3.10" },
+    { name = "django-render-block", specifier = ">=0.8" },
+    { name = "django-templated-email", specifier = ">=3.0" },
+    { name = "html2text", specifier = ">=2024.2" },
+    { name = "markdown", specifier = ">=3.7" },
+    { name = "premailer", specifier = ">=3.10" },
 ]
 
 [package.metadata.requires-dev]

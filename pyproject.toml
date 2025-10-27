@@ -30,13 +30,13 @@ classifiers = [
 ]
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "click~=8.1",
+    "click>=8.1",
     "django>=4.2.15",
-    "django-render-block~=0.8",
-    "django-templated-email~=3.0",
-    "html2text~=2024.2",
-    "markdown~=3.7",
-    "premailer~=3.10",
+    "django-render-block>=0.8",
+    "django-templated-email>=3.0",
+    "html2text>=2024.2",
+    "markdown>=3.7",
+    "premailer>=3.10",
 ]
 
 [project.urls]
