@@ -1,24 +1,10 @@
 # django-templated-email-md
 
-[![PyPI](https://img.shields.io/pypi/v/django-templated-email-md.svg)][pypi status]
-[![Status](https://img.shields.io/pypi/status/django-templated-email-md.svg)][pypi status]
-[![Python Version](https://img.shields.io/pypi/pyversions/django-templated-email-md)][pypi status]
-[![License](https://img.shields.io/pypi/l/django-templated-email-md)][license]
-
-[![Read the documentation at https://django-templated-email-md.readthedocs.io/](https://img.shields.io/readthedocs/django-templated-email-md/latest.svg?label=Read%20the%20Docs)][read the docs]
-[![Tests](https://github.com/OmenApps/django-templated-email-md/actions/workflows/tests.yml/badge.svg)][tests]
-[![Codecov](https://codecov.io/gh/OmenApps/django-templated-email-md/branch/main/graph/badge.svg)][codecov]
-
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)][pre-commit]
-[![Black](https://img.shields.io/badge/code%20style-black-000000.svg)][black]
-[![Published on Django Packages](https://img.shields.io/badge/Published%20on-Django%20Packages-0c3c26)](https://djangopackages.org/packages/p/django-templated-email-md/)
-
-[pypi status]: https://pypi.org/project/django-templated-email-md/
-[read the docs]: https://django-templated-email-md.readthedocs.io/
-[tests]: https://github.com/OmenApps/django-templated-email-md/actions?workflow=Tests
-[codecov]: https://app.codecov.io/gh/OmenApps/django-templated-email-md
-[pre-commit]: https://github.com/pre-commit/pre-commit
-[black]: https://github.com/psf/black
+[![PyPI](https://img.shields.io/pypi/v/django-templated-email-md)](https://pypi.org/project/django-templated-email-md/)
+[![Python versions](https://img.shields.io/pypi/pyversions/django-templated-email-md)](https://pypi.org/project/django-templated-email-md/)
+[![Django versions](https://img.shields.io/pypi/djversions/django-templated-email-md)](https://pypi.org/project/django-templated-email-md/)
+[![Documentation](https://readthedocs.org/projects/django-templated-email-md/badge/?version=latest)](https://django-templated-email-md.readthedocs.io/en/latest/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
