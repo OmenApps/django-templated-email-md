@@ -8,11 +8,18 @@ repos:
         types: [python]
         require_serial: true
         args: ["-c", "bandit.yml"]
-      - id: black
-        name: black
-        entry: black
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check
         language: system
-        types: [python]
+        types_or: [python, pyi]
+        require_serial: true
+        args: ["--fix"]
+      - id: ruff-format
+        name: ruff format
+        entry: ruff format
+        language: system
+        types_or: [python, pyi]
         require_serial: true
       - id: check-added-large-files
         name: Check for added large files
@@ -39,7 +46,7 @@ repos:
         entry: end-of-file-fixer
         language: system
         types: [text]
-        stages: [commit, push, manual]
+        stages: [pre-commit, pre-push, manual]
       - id: flake8
         name: flake8
         entry: flake8
@@ -47,13 +54,6 @@ repos:
         types: [python]
         require_serial: true
         args: [--darglint-ignore-regex, .*]
-      - id: isort
-        name: isort
-        entry: isort
-        require_serial: true
-        language: system
-        types_or: [cython, pyi, python]
-        args: ["--filter-files"]
       - id: pyupgrade
         name: pyupgrade
         description: Automatically upgrade syntax for newer versions.
@@ -66,7 +66,7 @@ repos:
         entry: trailing-whitespace-fixer
         language: system
         types: [text]
-        stages: [commit, push, manual]
+        stages: [pre-commit, pre-push, manual]
   # - repo: https://github.com/pre-commit/mirrors-prettier
   #   rev: v2.6.0
   #   hooks:

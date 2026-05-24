@@ -150,8 +150,7 @@ class Command(BaseCommand):
             return backend._render_email(template_name, context)
         except TemplateDoesNotExist as exc:
             raise CommandError(
-                f"Template {template_name!r} not found. "
-                f"Ensure TEMPLATED_EMAIL_TEMPLATE_DIR is configured correctly."
+                f"Template {template_name!r} not found. Ensure TEMPLATED_EMAIL_TEMPLATE_DIR is configured correctly."
             ) from exc
 
     def _resolve_template_path(self, backend: MarkdownTemplateBackend, template_name: str) -> str | None:
@@ -255,7 +254,7 @@ class Command(BaseCommand):
         tpl_path = self._resolve_template_path(backend, template_name)
         if tpl_path is None:
             self.stderr.write(
-                self.style.WARNING("Could not resolve template path for --watch; " "file-change detection unavailable.")
+                self.style.WARNING("Could not resolve template path for --watch; file-change detection unavailable.")
             )
             return
 

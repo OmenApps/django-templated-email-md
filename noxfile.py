@@ -1,4 +1,5 @@
 """Nox sessions."""
+
 import os
 import shlex
 import shutil
@@ -15,9 +16,9 @@ from nox.sessions import Session
 DJANGO_STABLE_VERSION = "5.2"
 DJANGO_VERSIONS = [
     "4.2",
-    "5.0",
     "5.1",
     "5.2",
+    "6.0",
 ]
 
 # PYTHON_STABLE_VERSION should be set to the latest stable Python version
@@ -121,17 +122,16 @@ def precommit(session: Session, django: str) -> None:
     ]
     session.install(
         "bandit",
-        "black",
         "darglint",
         "flake8",
         "flake8-bugbear",
         "flake8-docstrings",
         "flake8-rst-docstrings",
-        "isort",
         "pep8-naming",
         "pre-commit",
         "pre-commit-hooks",
         "pyupgrade",
+        "ruff",
     )
     session.run("pre-commit", *args)
     if args and args[0] == "install":
@@ -152,7 +152,6 @@ def tests(session: Session, django: str) -> None:
     """Run the test suite."""
     session.run("uv", "sync", "--prerelease=allow", "--dev")
     try:
-
         session.run("coverage", "run", "-m", "pytest", "-vv", *session.posargs)
     finally:
         if session.interactive:

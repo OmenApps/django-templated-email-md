@@ -13,9 +13,9 @@ classifiers = [
     "Environment :: Web Environment",
     "Framework :: Django",
     "Framework :: Django :: 4.2",
-    "Framework :: Django :: 5.0",
     "Framework :: Django :: 5.1",
     "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
@@ -51,7 +51,6 @@ Changelog = "https://github.com/OmenApps/django-templated-email-md/releases"
 [dependency-groups]
 dev = [
     "bandit==1.8.6",
-    "black==25.9.0",
     "coverage[toml]==7.11.0",
     "darglint==1.8.1",
     "django-anymail==13.1",
@@ -60,7 +59,6 @@ dev = [
     "flake8-rst-docstrings==0.4.0",
     "flake8==7.3.0",
     "furo==2025.9.25",
-    "isort==7.0.0",
     "linkify-it-py==2.0.3",
     "myst-parser==4.0.1",
     "nh3>=0.2.18",
@@ -69,12 +67,13 @@ dev = [
     "pre-commit-hooks==6.0.0",
     "pre-commit==4.3.0",
     "psycopg-binary==3.2.11",
-    "Pygments==2.19.2",
+    "Pygments==2.20.0",
     "pytest-cov==7.0.0",
     "pytest-django==4.11.1",
-    "pytest==8.4.2",
+    "pytest==9.0.3",
     "python-environ==0.4.54",
     "pyupgrade==3.21.0",
+    "ruff==0.15.14",
     "pip-audit>=2.7.3",
     "sphinx-autobuild==2025.8.25",
     "sphinx-click==6.1.0",
@@ -88,14 +87,17 @@ where = ["src"]
 [tool.setuptools.package-data]
 templated_email_md = ["templates/templated_email/*", "templates/templated_email/components/*", "locale/**", "py.typed"]
 
-[tool.black]
+[tool.ruff]
 line-length = 120
-target-version = ["py311", "py312", "py313", "py314"]
-force-exclude = '''
-(
-  .nox
-)
-'''
+target-version = "py311"
+extend-exclude = [".nox"]
+
+[tool.ruff.lint]
+select = ["I"]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+lines-after-imports = 2
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
@@ -115,9 +117,3 @@ DJANGO_SETTINGS_MODULE = "example_project.settings"
 python_files = ["*test_*.py", "*_test.py", "example_project/*.py"]
 log_cli = true
 log_cli_level = "INFO"
-
-[tool.isort]
-profile = "black"
-force_single_line = true
-lines_after_imports = 2
-extend_skip = [".nox"]
