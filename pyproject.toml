@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "django-templated-email-md"
-version = "2025.10.2"
+version = "2026.5.1"
 description = "An extension for django-templated-email for creating emails with Markdown"
 authors = [{ name = "Jack Linke", email = "jacklinke@gmail.com" }]
 license = "MIT"
