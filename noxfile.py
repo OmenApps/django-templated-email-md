@@ -31,7 +31,7 @@ PACKAGE = "django_templated_email_md"
 nox.needs_version = ">= 2024.4.15"
 nox.options.sessions = (
     "pre-commit",
-    "safety",
+    "pip-audit",
     "tests",
     "xdoctest",
     "docs-build",
@@ -138,13 +138,12 @@ def precommit(session: Session, django: str) -> None:
         activate_virtualenv_in_precommit_hooks(session)
 
 
-@session(python=PYTHON_STABLE_VERSION)
+@session(name="pip-audit", python=PYTHON_STABLE_VERSION)
 @nox.parametrize("django", DJANGO_STABLE_VERSION)
-def safety(session: Session, django: str) -> None:
-    """Scan dependencies for insecure packages."""
-    requirements = session.posargs or ["requirements.txt"]
-    session.install("safety")
-    session.run("safety", "check", "--full-report", f"--file={requirements}")
+def pip_audit(session: Session, django: str) -> None:
+    """Scan dependencies for known vulnerabilities."""
+    session.run("uv", "sync", "--prerelease=allow", "--dev", external=True)
+    session.run("uv", "run", "--dev", "pip-audit", *session.posargs, external=True)
 
 
 @session(python=PYTHON_VERSIONS)
