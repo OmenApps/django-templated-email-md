@@ -45,7 +45,7 @@ class MarkdownTemplateBackend(TemplateBackend):
             fail_silently: Whether to suppress exceptions and return a fallback response
             template_prefix: Prefix for template names
             template_suffix: Suffix for template names
-            **kwargs: Additional keyword arguments
+            kwargs: Additional keyword arguments
         """
         super().__init__(
             fail_silently=fail_silently,
@@ -101,7 +101,6 @@ class MarkdownTemplateBackend(TemplateBackend):
 
         Overrides the send method to add support for a base URL, used by premailer to resolve relative URLs.
         """
-
         # Extract base_url from kwargs if provided, fall back to default
         base_url = kwargs.pop("base_url", self.base_url)
 
@@ -250,6 +249,16 @@ class MarkdownTemplateBackend(TemplateBackend):
 
         Returns:
             Dictionary containing the rendered HTML, plain text, and subject.
+
+        Raises:
+            TemplateDoesNotExist: If the specified template cannot be found.
+            TemplateSyntaxError: If the template contains invalid syntax.
+            MarkdownRenderError: If Markdown conversion fails.
+            CSSInliningError: If CSS inlining fails.
+            ValueError: If an invalid value is encountered during rendering.
+            AttributeError: If an attribute access fails during rendering.
+            TypeError: If a type error occurs during rendering.
+            OSError: If a filesystem error occurs while loading resources.
         """
         fallback_content = _("Email template rendering failed.")
 
@@ -401,10 +410,13 @@ class MarkdownTemplateBackend(TemplateBackend):
 
         Returns:
             Rendered HTML content.
+
+        Raises:
+            MarkdownRenderError: If Markdown conversion fails and fail_silently is False.
         """
         try:
             html_content = self._render_markdown(content)
-        except MarkdownRenderError as e:
+        except MarkdownRenderError:
             if self.fail_silently:
                 html_content = "Email template rendering failed."
             else:
@@ -424,6 +436,11 @@ class MarkdownTemplateBackend(TemplateBackend):
 
         Returns:
             Plain text content without Markdown formatting
+
+        Raises:
+            AttributeError: If an attribute error occurs during plain text generation.
+            ValueError: If an invalid value is encountered during plain text generation.
+            TypeError: If a type error occurs during plain text generation.
         """
         try:
             plain_text = self._generate_plain_text(content)
