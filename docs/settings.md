@@ -257,6 +257,28 @@ TEMPLATED_EMAIL_SANITIZE_KWARGS = {
 }
 ```
 
+> **Note:** nh3's DEFAULT allowlist strips most attributes, including `class` and `target`.
+> Because sanitization runs on the Markdown-rendered content fragment, this has two
+> consequences for the bundled components:
+>
+> (a) The shipped bulletproof partials (`templated_email/components/button.html` and
+> `divider.html`) included from a `content` block will lose their `class="btn btn-primary"` /
+> `class="email-divider"` and `target` attributes, so Premailer can no longer style them
+> correctly.
+>
+> (b) Any `class`-based styling written as raw HTML directly in your `content` block
+> (e.g. `<div class="foo">`) is also removed.
+>
+> To keep those attributes, extend the allowlist via `TEMPLATED_EMAIL_SANITIZE_KWARGS`
+> (e.g. allow `class` on the relevant tags, as shown in the example above).
+>
+> **Important interaction with render caching:** nh3 allowlists are typically expressed
+> as Python `set`s (e.g. `{"class"}`), and sets are not JSON-serializable. The render
+> cache key is built with `json.dumps`, so if `TEMPLATED_EMAIL_SANITIZE_KWARGS` contains
+> a set (or any other non-JSON-serializable value), render caching is silently skipped
+> for those calls. If you want both sanitization with custom kwargs and caching, be aware
+> of this limitation, or express allowlists in a JSON-serializable form where possible.
+
 ## Complete Configuration Example
 
 Here's a complete example showing all settings with their default values:
@@ -334,6 +356,18 @@ cached. If the context or `TEMPLATED_EMAIL_SANITIZE_KWARGS` contains values
 that are not JSON-serializable (e.g. a `set` used as an nh3 allowlist, or a
 model instance), caching is skipped for that call and the email is rendered
 normally - this is a safe fallback, not an error.
+
+> **Note:** The cache key incorporates the template NAME, context, active language, base
+> URL, and rendering-relevant settings (markdown extensions, html2text settings, sanitize
+> flags, and branding) - but NOT the template file's contents. If you edit a template
+> file without changing any of those inputs, cached output continues to be served until
+> the entry expires. After deploying changed templates, either flush the cache (or cycle
+> the cache alias) or keep `TEMPLATED_EMAIL_CACHE_TIMEOUT` short relative to your deploy
+> cadence.
+>
+> If the context (or `TEMPLATED_EMAIL_SANITIZE_KWARGS`) contains values that are not
+> JSON-serializable, the cache key cannot be computed and caching is safely skipped for
+> that call - no error is raised.
 
 ### `TEMPLATED_EMAIL_CACHE_TIMEOUT`
 

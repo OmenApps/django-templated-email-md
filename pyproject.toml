@@ -30,7 +30,7 @@ classifiers = [
 ]
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "click>=8.1",
+    "asgiref>=3.6",
     "django>=4.2.15",
     "django-render-block>=0.8",
     "django-templated-email>=3.0",
@@ -48,8 +48,8 @@ Repository = "https://github.com/OmenApps/django-templated-email-md"
 Documentation = "https://django-templated-email-md.readthedocs.io"
 Changelog = "https://github.com/OmenApps/django-templated-email-md/releases"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "bandit==1.8.6",
     "black==25.9.0",
     "coverage[toml]==7.11.0",
@@ -86,7 +86,7 @@ dev-dependencies = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-templated_email_md = ["templates/templated_email/*", "templates/templated_email/components/*", "locale/*", "py.typed"]
+templated_email_md = ["templates/templated_email/*", "templates/templated_email/components/*", "locale/**", "py.typed"]
 
 [tool.black]
 line-length = 120

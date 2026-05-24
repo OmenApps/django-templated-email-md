@@ -30,7 +30,8 @@ def build_preview_page(subject: str, preheader: str, html_body: str, plain: str)
     """
     escaped_html_body = html.escape(html_body, quote=True)
     escaped_plain = html.escape(plain, quote=False)
-    srcdoc_attr = "srcdoc=" + '"' + escaped_html_body + '"'
+    # Single-quoted srcdoc attribute: quotes are HTML attribute delimiters, not Python repr-quoting.
+    iframe_tag = f"<iframe srcdoc='{escaped_html_body}' title=\"HTML email preview\"></iframe>"  # noqa: B907
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -102,7 +103,7 @@ def build_preview_page(subject: str, preheader: str, html_body: str, plain: str)
   <div id="panels">
     <div class="panel">
       <div class="panel-label">HTML Preview</div>
-      <iframe {srcdoc_attr} title="HTML email preview"></iframe>
+      {iframe_tag}
     </div>
     <div class="panel">
       <div class="panel-label">Plain Text</div>

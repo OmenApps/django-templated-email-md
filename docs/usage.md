@@ -585,7 +585,7 @@ directory, and opens it in your default browser.
 | `--output PATH` / `-o PATH` | Output path for the preview file (default: `email_preview.html`). |
 | `--open` | Open the written file in the system default browser. |
 | `--part PART` | Print only one part to stdout: `html`, `plain`, `subject`, or `preheader`. |
-| `--watch` | Re-render automatically whenever the template file changes (Ctrl-C to stop). |
+| `--watch` | Re-render automatically whenever the template file changes (Ctrl-C to stop). Watch mode detects changes to the named template file only - it does not detect edits to the base HTML template, the stylesheet, or included component partials; re-run the command (or touch the template file) to pick those up. |
 
 ### Print a single part
 
@@ -684,3 +684,9 @@ in a thread pool managed by `asgiref`, so the async event loop is never blocked.
 > **Note:** `asend` is a thin wrapper - it does not add async-native SMTP
 > support. For high-throughput async email delivery, consider a task queue such
 > as Celery or Django-Q with `asend` as the async entry point.
+
+> **Note:** `asend` offloads a single blocking send off the event loop, but it
+> runs thread-sensitively (to stay safe with ORM writes such as when
+> `create_link=True` is used). As a result, many concurrent `asend` calls execute
+> one at a time rather than in parallel. For high-volume fan-out to many recipients,
+> a task queue (Celery, Django-Q, etc.) is the recommended approach.

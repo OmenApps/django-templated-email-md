@@ -4,10 +4,9 @@ import asyncio
 import html as html_stdlib
 import io
 import os
-
+import random
+import re
 from unittest.mock import patch
-
-from django.test import override_settings
 
 import pytest
 from django.conf import settings
@@ -16,13 +15,15 @@ from django.core.cache import caches
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.template import TemplateDoesNotExist
+from django.test import override_settings
+from django.urls import reverse
 from django.utils import translation
 from django.utils.translation import gettext as _
 from templated_email import send_templated_mail
 
-from example_project.example.views import index
-from example_project.urls import urlpatterns
 from templated_email_md.backend import MarkdownTemplateBackend
+from templated_email_md.exceptions import CSSInliningError
+from templated_email_md.exceptions import MarkdownRenderError
 
 
 def test_succeeds() -> None:
@@ -284,7 +285,6 @@ def test_markdown_extensions(settings):
 
 def test_large_email_content():
     """Test that large email content is handled correctly."""
-
     send_templated_mail(
         template_name="test_large_content",
         from_email="from@example.com",
@@ -416,9 +416,10 @@ def test_remove_comments():
 
 
 def test_default_subject_and_preheader():
-    """
-    Test that the default subject and preheader are used when
-    not provided in the template or context.
+    """Default subject and preheader are used when absent from template and context.
+
+    Sends a template with no subject or preheader blocks and verifies the backend
+    falls back to its configured defaults.
     """
     # Send an email without subject or preheader in template or context
     send_templated_mail(
@@ -443,9 +444,10 @@ def test_default_subject_and_preheader():
 
 
 def test_subject_and_preheader_provided():
-    """
-    Test that when subject and preheader are provided in the template,
-    they override the default values.
+    """Subject and preheader from the template override the backend defaults.
+
+    Sends a template that defines both blocks and asserts the values appear
+    correctly in the sent email.
     """
     # Send an email with subject and preheader in the template
     send_templated_mail(
@@ -467,10 +469,6 @@ def test_subject_and_preheader_provided():
 
 def test_rendering_local_links():
     """Test that local links are rendered correctly by premailer if base_url is provided."""
-    import random  # pylint: disable=C0415
-
-    from django.urls import reverse
-
     some_id = random.randint(1, 100)
     send_templated_mail(
         template_name="test_render_local_links",
@@ -488,8 +486,6 @@ def test_rendering_local_links():
     email = mail.outbox[0]
     html_content = email.alternatives[0][0]
 
-    url = reverse("index", args=[some_id])
-
     # Check that the email was sent
     assert email.subject == "Hello!"
     assert "Hello Test User!" in email.body
@@ -501,9 +497,10 @@ def test_rendering_local_links():
 
 
 def test_custom_default_subject_and_preheader():
-    """
-    Test that the custom default subject and preheader from settings
-    are used when not provided in the template or context.
+    """Custom default subject and preheader from settings are used when template omits them.
+
+    Sets TEMPLATED_EMAIL_DEFAULT_SUBJECT and TEMPLATED_EMAIL_DEFAULT_PREHEADER via
+    direct settings mutation, sends a template with no blocks, and verifies the values.
     """
     settings.TEMPLATED_EMAIL_DEFAULT_SUBJECT = "Default Subject from Settings"
     settings.TEMPLATED_EMAIL_DEFAULT_PREHEADER = "Default Preheader from Settings"
@@ -547,8 +544,6 @@ def test_custom_html2text_settings(backend) -> None:
 
 def test_default_subject_preheader_settings(backend) -> None:
     """Test that default subject and preheader settings are used when not provided."""
-    from django.test import override_settings
-
     custom_subject = "Custom Default Subject"
     custom_preheader = "Custom Default Preheader"
 
@@ -581,8 +576,6 @@ def test_fail_silently_render_email(backend) -> None:
 
 def test_fail_silently_none_initialization() -> None:
     """Test that backend handles fail_silently=None during initialization."""
-    from django.test import override_settings
-
     # When fail_silently is explicitly None, it should fall back to settings
     backend_with_none = MarkdownTemplateBackend(fail_silently=None)
 
@@ -621,9 +614,6 @@ def test_template_without_content_block(backend) -> None:
 
 def test_markdown_render_error_with_fail_silently() -> None:
     """Test that MarkdownRenderError is caught when fail_silently=True."""
-    from unittest.mock import patch
-    from templated_email_md.exceptions import MarkdownRenderError
-
     backend = MarkdownTemplateBackend(fail_silently=True)
 
     # Mock markdown.markdown to raise an exception
@@ -637,9 +627,6 @@ def test_markdown_render_error_with_fail_silently() -> None:
 
 def test_markdown_render_error_without_fail_silently() -> None:
     """Test that MarkdownRenderError is raised when fail_silently=False."""
-    from unittest.mock import patch
-    from templated_email_md.exceptions import MarkdownRenderError
-
     backend = MarkdownTemplateBackend(fail_silently=False)
 
     # Mock markdown.markdown to raise an exception
@@ -655,9 +642,6 @@ def test_markdown_render_error_without_fail_silently() -> None:
 
 def test_css_inlining_error_with_fail_silently() -> None:
     """Test that CSSInliningError is caught when fail_silently=True."""
-    from unittest.mock import patch
-    from templated_email_md.exceptions import CSSInliningError
-
     backend = MarkdownTemplateBackend(fail_silently=True)
 
     # Mock premailer.transform to raise an exception
@@ -672,9 +656,6 @@ def test_css_inlining_error_with_fail_silently() -> None:
 
 def test_css_inlining_error_without_fail_silently() -> None:
     """Test that CSSInliningError is raised when fail_silently=False."""
-    from unittest.mock import patch
-    from templated_email_md.exceptions import CSSInliningError
-
     backend = MarkdownTemplateBackend(fail_silently=False)
 
     # Mock premailer.transform to raise an exception
@@ -690,8 +671,6 @@ def test_css_inlining_error_without_fail_silently() -> None:
 
 def test_plain_text_generation_error_with_fail_silently() -> None:
     """Test that plain text generation errors are caught when fail_silently=True."""
-    from unittest.mock import patch
-
     backend = MarkdownTemplateBackend(fail_silently=True)
 
     # Mock html2text to raise an exception
@@ -706,8 +685,6 @@ def test_plain_text_generation_error_with_fail_silently() -> None:
 
 def test_plain_text_generation_error_without_fail_silently() -> None:
     """Test that plain text generation errors are raised when fail_silently=False."""
-    from unittest.mock import patch
-
     backend = MarkdownTemplateBackend(fail_silently=False)
 
     # Mock html2text to raise an exception
@@ -724,8 +701,6 @@ def test_plain_text_generation_error_without_fail_silently() -> None:
 
 def test_context_base_url_restoration(backend) -> None:
     """Test that _base_url in context is properly restored after send()."""
-    from django.core import mail
-
     # Create context with a pre-existing _base_url
     context = {
         "name": "Test User",
@@ -747,9 +722,6 @@ def test_context_base_url_restoration(backend) -> None:
 
 def test_markdown_import_error() -> None:
     """Test handling of ImportError when markdown extension is not found."""
-    from unittest.mock import patch
-    from templated_email_md.exceptions import MarkdownRenderError
-
     backend = MarkdownTemplateBackend(fail_silently=False)
 
     # Mock markdown.markdown to raise ImportError
@@ -848,14 +820,6 @@ def test_file_changed_returns_true_after_utime(tmp_path):
     assert new_mtime == future
 
 
-def test_preview_email_management_command_is_discoverable():
-    """Django must be able to load the preview_email management command."""
-    from django.core.management import load_command_class
-
-    cmd_class = load_command_class("templated_email_md", "preview_email")
-    assert cmd_class is not None
-
-
 def test_preview_email_writes_html_file(tmp_path):
     """preview_email must write a full HTML document containing rendered content."""
     output_file = tmp_path / "out.html"
@@ -906,6 +870,23 @@ def test_preview_email_part_plain_prints_to_stdout():
     assert "Preview User" in output, f"Expected rendered name in plain output, got: {output!r}"
 
 
+def test_preview_email_part_html_prints_to_stdout():
+    """preview_email --part html prints the rendered HTML document to stdout."""
+    stdout_buf = io.StringIO()
+    call_command(
+        "preview_email",
+        "test_message",
+        "--context",
+        '{"name": "Preview User"}',
+        "--part",
+        "html",
+        stdout=stdout_buf,
+    )
+    output = stdout_buf.getvalue()
+    assert "<!DOCTYPE html>" in output
+    assert "Preview User" in output
+
+
 def test_preview_email_raises_command_error_for_missing_template():
     """preview_email must raise CommandError when the template does not exist."""
     with pytest.raises(CommandError):
@@ -952,11 +933,11 @@ def test_preview_email_inline_context_wins_over_context_file(tmp_path):
     assert "FileUser" not in content
 
 
-def test_watch_render_once_round_trip(tmp_path):
-    """A single _render + _write_preview cycle must produce correct output.
+def test_preview_email_output_file_is_overwritten_on_second_render(tmp_path):
+    """A second call to preview_email with the same output path overwrites the file.
 
-    This exercises the watch-mode code path without entering the infinite loop,
-    confirming that re-rendering after a file change produces a valid preview.
+    Verifies that repeated renders (as the --watch loop performs internally) produce
+    a valid, up-to-date HTML document each time rather than appending or erroring.
     """
     output_file = tmp_path / "watch_out.html"
 
@@ -1006,8 +987,6 @@ def test_preview_email_nondict_context_raises_command_error():
 
 def test_branding_defaults() -> None:
     """Test that a fresh backend with no TEMPLATED_EMAIL_BRANDING setting has correct defaults."""
-    from django.test import override_settings
-
     with override_settings(TEMPLATED_EMAIL_BRANDING={}):
         fresh_backend = MarkdownTemplateBackend()
         assert fresh_backend.branding["primary_color"] == "#3498db"
@@ -1024,8 +1003,6 @@ def test_branding_defaults() -> None:
 
 def test_branding_merge_preserves_defaults() -> None:
     """Test that user-supplied TEMPLATED_EMAIL_BRANDING merges over defaults without clobbering others."""
-    from django.test import override_settings
-
     with override_settings(TEMPLATED_EMAIL_BRANDING={"primary_color": "#ff0000"}):
         fresh_backend = MarkdownTemplateBackend()
         # User override applied
@@ -1046,8 +1023,6 @@ def test_branding_context_backward_compatible(backend) -> None:
 
 def test_branding_css_overrides_applied() -> None:
     """Test that TEMPLATED_EMAIL_BRANDING colors appear in rendered HTML output."""
-    from django.test import override_settings
-
     with override_settings(
         TEMPLATED_EMAIL_BRANDING={
             "background_color": "#112233",
@@ -1067,8 +1042,6 @@ def test_branding_css_overrides_applied() -> None:
 
 def test_branding_logo_rendered_when_provided() -> None:
     """Test that a logo <img> appears in output when logo_url is set."""
-    from django.test import override_settings
-
     with override_settings(
         TEMPLATED_EMAIL_BRANDING={
             "logo_url": "https://cdn.example.com/logo.png",
@@ -1084,8 +1057,6 @@ def test_branding_logo_rendered_when_provided() -> None:
 
 def test_branding_logo_absent_when_not_provided() -> None:
     """Test that no logo <img> appears when logo_url is empty (the default)."""
-    from django.test import override_settings
-
     with override_settings(TEMPLATED_EMAIL_BRANDING={}):
         fresh_backend = MarkdownTemplateBackend()
         response = fresh_backend._render_email("test_message", {"name": "X"})
@@ -1144,10 +1115,10 @@ def test_divider_component(backend) -> None:
     # Content around the divider must also render
     assert "Above the divider" in response["html"]
     assert "Below the divider" in response["html"]
-    # Dark-mode override rule must be preserved in the rendered style block
-    # (premailer normalises #444444 to #444, so match the shortened form)
+    # Dark-mode override rule must be preserved in the rendered style block.
+    # cssutils may normalize #444444 to #444 or leave it expanded; match both.
     assert "email-divider td" in response["html"]
-    assert "border-bottom-color: #444" in response["html"]
+    assert re.search(r"border-bottom-color:\s*#444(?:444)?", response["html"])
 
 
 def test_sanitize_setting_default_is_false(backend) -> None:
@@ -1157,8 +1128,6 @@ def test_sanitize_setting_default_is_false(backend) -> None:
 
 def test_sanitize_settings_read_from_django_settings() -> None:
     """Test that TEMPLATED_EMAIL_SANITIZE and TEMPLATED_EMAIL_SANITIZE_KWARGS are read from settings."""
-    from django.test import override_settings
-
     custom_kwargs = {"tags": {"p", "a", "strong", "em"}}
 
     with override_settings(TEMPLATED_EMAIL_SANITIZE=True, TEMPLATED_EMAIL_SANITIZE_KWARGS=custom_kwargs):
@@ -1179,8 +1148,6 @@ def test_sanitize_html_removes_script_tags() -> None:
 
 def test_sanitize_html_fail_silently_returns_input_on_error() -> None:
     """Test that _sanitize_html returns input unchanged when fail_silently=True and nh3 raises."""
-    from unittest.mock import patch
-
     sanitizing_backend = MarkdownTemplateBackend(fail_silently=True)
     dirty = "<p>test</p>"
 
@@ -1193,8 +1160,6 @@ def test_sanitize_html_fail_silently_returns_input_on_error() -> None:
 
 def test_sanitize_html_raises_on_error_without_fail_silently() -> None:
     """Test that _sanitize_html raises when fail_silently=False and nh3 raises."""
-    from unittest.mock import patch
-
     sanitizing_backend = MarkdownTemplateBackend(fail_silently=False)
 
     with patch("templated_email_md.backend.nh3") as mock_nh3:
@@ -1216,8 +1181,6 @@ def test_xss_content_present_without_sanitization(backend) -> None:
 
 def test_xss_content_removed_with_sanitization() -> None:
     """Test that script tags are removed when TEMPLATED_EMAIL_SANITIZE=True."""
-    from django.test import override_settings
-
     with override_settings(TEMPLATED_EMAIL_SANITIZE=True):
         sanitizing_backend = MarkdownTemplateBackend()
         result = sanitizing_backend._render_email("test_xss_content", {})
@@ -1230,8 +1193,6 @@ def test_xss_content_removed_with_sanitization() -> None:
 
 def test_sanitize_html_raises_importerror_when_nh3_missing() -> None:
     """_sanitize_html raises ImportError when nh3 is not installed, even with fail_silently=True."""
-    from unittest.mock import patch
-
     # fail_silently=True must still raise ImportError (a missing optional dep is a
     # misconfiguration; silently skipping requested sanitization would be unsafe)
     backend = MarkdownTemplateBackend(fail_silently=True)
@@ -1250,8 +1211,6 @@ def test_cache_settings_defaults():
 
 def test_cache_settings_custom():
     """Backend reads custom cache settings from Django settings."""
-    from django.test import override_settings
-
     with override_settings(
         TEMPLATED_EMAIL_CACHE_RENDERED=True,
         TEMPLATED_EMAIL_CACHE_TIMEOUT=600,
@@ -1290,17 +1249,19 @@ def test_render_cache_key_differs_on_template_name_change():
     assert key1 != key2
 
 
-def test_render_cache_key_excludes_base_url_from_context_hash():
-    """_base_url is excluded from the context JSON hash (it is hashed separately)."""
+def test_render_cache_key_includes_base_url_as_separate_field():
+    """The cache key encodes base_url as a separate payload field, not via the context JSON.
+
+    _base_url is stripped from the context dict before JSON serialization, then
+    hashed independently. Two calls that differ only in _base_url still produce
+    different keys because the separate field changes even though the context-JSON
+    portion is identical.
+    """
     backend = MarkdownTemplateBackend()
-    # Same logical context, one has _base_url injected by send(), one does not --
-    # the resulting key should differ because _base_url is handled as a separate field.
     key_with = backend._render_cache_key(
         "test_message", {"name": "Alice", "_base_url": "http://example.com"}, None, None
     )
-    key_without = backend._render_cache_key(
-        "test_message", {"name": "Alice", "_base_url": "different"}, None, None
-    )
+    key_without = backend._render_cache_key("test_message", {"name": "Alice", "_base_url": "different"}, None, None)
     # Keys differ because _base_url is included in the hash as a SEPARATE field
     # (not via the context dict), so changing it still changes the key.
     assert key_with != key_without
@@ -1311,6 +1272,24 @@ def test_render_cache_key_returns_none_for_nonserializable_context():
     backend = MarkdownTemplateBackend()
     # plain object() cannot be JSON-serialized without default=str
     key = backend._render_cache_key("test_message", {"obj": object()}, None, None)
+    assert key is None
+
+
+def test_render_cache_key_differs_on_language():
+    """The cache key differs across active languages (i18n templates must not collide)."""
+    backend = MarkdownTemplateBackend()
+    with translation.override("en"):
+        key_en = backend._render_cache_key("test_message", {}, None, None)
+    with translation.override("es"):
+        key_es = backend._render_cache_key("test_message", {}, None, None)
+    assert key_en != key_es
+
+
+def test_render_cache_key_returns_none_for_nonserializable_sanitize_kwargs():
+    """A set in TEMPLATED_EMAIL_SANITIZE_KWARGS (not JSON-serializable) makes the key None, skipping cache."""
+    with override_settings(TEMPLATED_EMAIL_SANITIZE_KWARGS={"tags": {"p", "a"}}):
+        backend = MarkdownTemplateBackend()
+        key = backend._render_cache_key("test_message", {"name": "Alice"}, None, None)
     assert key is None
 
 
@@ -1483,9 +1462,12 @@ def test_render_cache_key_differs_on_sanitize():
     assert key_off != key_on
 
 
-@pytest.mark.django_db
 def test_asend_sends_email():
-    """The asend method delivers an email via the sync send path, awaitable from sync test code."""
+    """The asend method delivers an email via the sync send path, awaitable from sync test code.
+
+    No @pytest.mark.django_db needed: pytest-django uses the locmem email backend
+    which resets mail.outbox per test without any database involvement.
+    """
     backend = MarkdownTemplateBackend()
 
     asyncio.run(
@@ -1504,9 +1486,12 @@ def test_asend_sends_email():
     assert "Async User" in mail.outbox[0].body
 
 
-@pytest.mark.django_db
 def test_asend_returns_same_result_as_send():
-    """The asend method returns the same value as the synchronous send method."""
+    """The asend method returns the same value as the synchronous send method.
+
+    No @pytest.mark.django_db needed: the locmem email backend handles mail.outbox
+    isolation without touching the database.
+    """
     backend = MarkdownTemplateBackend()
 
     result = asyncio.run(

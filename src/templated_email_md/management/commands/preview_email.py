@@ -2,12 +2,16 @@
 
 import json
 import os
+import time
 import webbrowser
+from argparse import ArgumentParser
 from pathlib import Path
+from typing import Any
 
 from django.core.management.base import BaseCommand
 from django.core.management.base import CommandError
 from django.template import TemplateDoesNotExist
+from django.template.loader import get_template
 
 from templated_email_md.backend import MarkdownTemplateBackend
 from templated_email_md.preview import build_preview_page
@@ -33,7 +37,7 @@ class Command(BaseCommand):
 
     help = "Render a Markdown email template to an HTML preview file."
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: ArgumentParser) -> None:
         """Register CLI arguments for the command.
 
         Args:
@@ -146,7 +150,8 @@ class Command(BaseCommand):
             return backend._render_email(template_name, context)
         except TemplateDoesNotExist as exc:
             raise CommandError(
-                f"Template {template_name!r} not found. " "Ensure TEMPLATED_EMAIL_TEMPLATE_DIR is configured correctly."
+                f"Template {template_name!r} not found. "
+                f"Ensure TEMPLATED_EMAIL_TEMPLATE_DIR is configured correctly."
             ) from exc
 
     def _resolve_template_path(self, backend: MarkdownTemplateBackend, template_name: str) -> str | None:
@@ -162,15 +167,11 @@ class Command(BaseCommand):
         Returns:
             Absolute filesystem path string, or ``None`` if unresolvable.
         """
-        from django.template.loader import get_template
-
         # NOTE: template_prefix and template_suffix are implementation details of the
         # parent django-templated-email TemplateBackend class. No public API exists for
-        # resolving the on-disk path of a template, so we access these private attributes
-        # directly. getattr() with defaults ensures we degrade gracefully (return None)
-        # if the attributes are ever renamed or removed in a future library version.
-        suffix = getattr(backend, "template_suffix", "md")
-        template_dir = getattr(backend, "template_prefix", "templated_email/") or "templated_email/"
+        # resolving the on-disk path of a template, so we access these attributes directly.
+        suffix = backend.template_suffix
+        template_dir = backend.template_prefix or "templated_email/"
         full_name = f"{template_dir}{template_name}.{suffix}"
         try:
             tpl = get_template(full_name)
@@ -179,7 +180,7 @@ class Command(BaseCommand):
         except Exception:
             return None
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> str | None:
         """Execute the preview_email command.
 
         Args:
@@ -251,8 +252,6 @@ class Command(BaseCommand):
             context: Dict of template variables.
             output_path: Destination file path for the preview.
         """
-        import time
-
         tpl_path = self._resolve_template_path(backend, template_name)
         if tpl_path is None:
             self.stderr.write(

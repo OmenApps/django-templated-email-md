@@ -19,12 +19,14 @@ from django.template import TemplateSyntaxError
 from django.template.loader import get_template
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _lazy
 from render_block import BlockNotFound
 from render_block import render_block_to_string
 from templated_email.backends.vanilla_django import TemplateBackend
 
 from templated_email_md.exceptions import CSSInliningError
 from templated_email_md.exceptions import MarkdownRenderError
+
 
 try:
     import nh3
@@ -59,6 +61,8 @@ class MarkdownTemplateBackend(TemplateBackend):
         TEMPLATED_EMAIL_CACHE_TIMEOUT (int): Cache TTL in seconds. Default 300.
         TEMPLATED_EMAIL_CACHE_ALIAS (str): Django cache alias to use. Default "default".
     """
+
+    _CACHE_KEY_PREFIX = "templated_email_md:render:"
 
     def __init__(
         self,
@@ -100,8 +104,8 @@ class MarkdownTemplateBackend(TemplateBackend):
             ],
         )
         self.html2text_settings = getattr(settings, "TEMPLATED_EMAIL_HTML2TEXT_SETTINGS", {})
-        self.default_subject = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_SUBJECT", _("Hello!"))
-        self.default_preheader = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_PREHEADER", _(""))
+        self.default_subject = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_SUBJECT", _lazy("Hello!"))
+        self.default_preheader = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_PREHEADER", _lazy(""))
         self.base_url = getattr(settings, "TEMPLATED_EMAIL_BASE_URL", "")
         self.branding: dict[str, str] = {
             **DEFAULT_BRANDING,
@@ -137,6 +141,32 @@ class MarkdownTemplateBackend(TemplateBackend):
         """Send an email using the Markdown template.
 
         Overrides the send method to add support for a base URL, used by premailer to resolve relative URLs.
+
+        Args:
+            template_name: The name of the Markdown template to render, or a list of names.
+            from_email: The sender email address.
+            recipient_list: List of recipient email addresses.
+            context: The context dict used to render the template.
+            cc: Optional list of CC email addresses.
+            bcc: Optional list of BCC email addresses.
+            fail_silently: Whether to suppress SMTP errors.
+            headers: Optional extra email headers.
+            template_prefix: Optional prefix for template names.
+            template_suffix: Optional suffix (file extension) for template names.
+            template_dir: Optional directory override for template lookup.
+            file_extension: Optional file extension override.
+            auth_user: Optional SMTP authentication username.
+            auth_password: Optional SMTP authentication password.
+            connection: Optional pre-opened email backend connection.
+            attachments: Optional list of attachments to include.
+            create_link: Whether to persist a link record via django-templated-email.
+            kwargs: Additional keyword arguments forwarded to the parent send method.
+                Pass ``base_url`` here to override the instance-level base URL for
+                this call only.
+
+        Returns:
+            The return value of the parent send method (typically the number of
+            messages sent, or None under the test email backend).
         """
         # Extract base_url from kwargs if provided, fall back to default
         base_url = kwargs.pop("base_url", self.base_url)
@@ -272,7 +302,7 @@ class MarkdownTemplateBackend(TemplateBackend):
             return None
 
         digest = hashlib.sha256(serialised.encode()).hexdigest()
-        return f"templated_email_md:render:{digest}"
+        return f"{self._CACHE_KEY_PREFIX}{digest}"
 
     def _render_markdown(self, content: str) -> str:
         """Convert Markdown content to HTML.
@@ -289,7 +319,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         try:
             return markdown.markdown(content, extensions=self.markdown_extensions)
         except (ValueError, AttributeError, ImportError, TypeError) as e:
-            logger.error("Failed to render Markdown: %s", e)
+            logger.error("Failed to render Markdown: %s", e, exc_info=True)
             if self.fail_silently:
                 return content  # Return raw content if conversion fails
             raise MarkdownRenderError(f"Failed to render Markdown: {e}") from e
@@ -322,7 +352,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         try:
             return nh3.clean(html, **self.sanitize_kwargs)
         except Exception as e:
-            logger.error("Failed to sanitize HTML: %s", e)
+            logger.error("Failed to sanitize HTML: %s", e, exc_info=True)
             if self.fail_silently:
                 return html
             raise
@@ -349,7 +379,7 @@ class MarkdownTemplateBackend(TemplateBackend):
                 base_url=base_url,
             )
         except (OSError, ValueError, AttributeError, TypeError) as e:
-            logger.error("Failed to inline CSS: %s", e)
+            logger.error("Failed to inline CSS: %s", e, exc_info=True)
             if self.fail_silently:
                 return html  # Return original HTML if inlining fails
             raise CSSInliningError(f"Failed to inline CSS: {e}") from e
@@ -486,6 +516,7 @@ class MarkdownTemplateBackend(TemplateBackend):
 
             return {"html": final_html, "plain": plain_text, "subject": subject, "preheader": preheader}
 
+        # BlockNotFound is caught internally by the _get_*_from_template helpers, so it cannot reach this handler.
         except (
             TemplateDoesNotExist,
             TemplateSyntaxError,
@@ -496,13 +527,14 @@ class MarkdownTemplateBackend(TemplateBackend):
             TypeError,
             OSError,
         ) as e:
-            logger.error("Failed to render email: %s", str(e))
+            logger.error("Failed to render email: %s", str(e), exc_info=True)
             if self.fail_silently:
                 return {
                     "html": fallback_content,
                     "plain": fallback_content,
                     "subject": self.default_subject,
                     "preheader": self.default_preheader,
+                    "_render_failed": True,
                 }
             raise
 
@@ -536,21 +568,25 @@ class MarkdownTemplateBackend(TemplateBackend):
             ``preheader``.
         """
         if not self.cache_rendered:
-            return self._render_email_uncached(template_name, context, template_dir, file_extension)
+            result = self._render_email_uncached(template_name, context, template_dir, file_extension)
+            result.pop("_render_failed", None)
+            return result
 
         key = self._render_cache_key(template_name, context, template_dir, file_extension)
         if key is None:
-            return self._render_email_uncached(template_name, context, template_dir, file_extension)
+            result = self._render_email_uncached(template_name, context, template_dir, file_extension)
+            result.pop("_render_failed", None)
+            return result
 
         cache = caches[self.cache_alias]
         cached = cache.get(key)
+        logger.debug("render cache %s for %r", "hit" if cached is not None else "miss", template_name)
         if cached is not None:
             return cached
 
         result = self._render_email_uncached(template_name, context, template_dir, file_extension)
-        # Do not cache the fail_silently fallback: a transient failure must not be
-        # served as cached error content for the rest of the cache timeout.
-        if not (self.fail_silently and result.get("html") == _("Email template rendering failed.")):
+        failed = result.pop("_render_failed", False)
+        if not failed:
             cache.set(key, result, self.cache_timeout)
         return result
 
@@ -598,7 +634,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         self,
         template_path: str,
         context: dict[str, Any],
-    ) -> dict[str, str]:
+    ) -> str:
         """Extract content from template block.
 
         Args:
@@ -606,7 +642,7 @@ class MarkdownTemplateBackend(TemplateBackend):
             context: Context to render the template with
 
         Returns:
-            Dictionary containing the rendered HTML, plain text, and subject.
+            Rendered Markdown content string.
         """
         try:
             content = render_block_to_string(template_path, "content", context).strip()
@@ -680,7 +716,7 @@ class MarkdownTemplateBackend(TemplateBackend):
         try:
             plain_text = self._generate_plain_text(content)
         except (AttributeError, ValueError, TypeError) as e:
-            logger.error("Error generating plain text: %s", e)
+            logger.error("Error generating plain text: %s", e, exc_info=True)
             if self.fail_silently:
                 plain_text = "Email template rendering failed."
             else:
@@ -709,10 +745,10 @@ class MarkdownTemplateBackend(TemplateBackend):
         """Remove HTML, JavaScript, and CSS comments from HTML content while retaining URLs and IE-specific comments.
 
         Args:
-            html (str): The HTML content containing comments.
+            html: The HTML content containing comments.
 
         Returns:
-            str: HTML content with comments removed.
+            HTML content with comments removed.
         """
         html = self._remove_multiline_comments(html)
         html = self._remove_singleline_comments(html)

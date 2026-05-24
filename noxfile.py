@@ -150,7 +150,7 @@ def pip_audit(session: Session, django: str) -> None:
 @nox.parametrize("django", DJANGO_VERSIONS)
 def tests(session: Session, django: str) -> None:
     """Run the test suite."""
-    session.run("uv", "sync", "--prerelease=allow", "--extra=dev")
+    session.run("uv", "sync", "--prerelease=allow", "--dev")
     try:
 
         session.run("coverage", "run", "-m", "pytest", "-vv", *session.posargs)
