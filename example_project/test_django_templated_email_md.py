@@ -533,26 +533,6 @@ def test_custom_html2text_settings(backend) -> None:
     assert "test image" not in plain_text
 
 
-def test_template_blocks_extraction(backend) -> None:
-    """Test extraction of subject and content blocks from template."""
-    template_content = """
-        {% block subject %}Test Subject{% endblock %}
-
-        {% block content %}
-        # Test Content
-
-        This is test content.
-        {% endblock %}
-    """
-
-    context = {}
-    blocks = backend._extract_blocks(template_content, context)
-
-    assert blocks["subject"] == "Test Subject"
-    assert "# Test Content" in blocks["content"]
-    assert "This is test content." in blocks["content"]
-
-
 def test_default_subject_preheader_settings(backend) -> None:
     """Test that default subject and preheader settings are used when not provided."""
     from django.test import override_settings

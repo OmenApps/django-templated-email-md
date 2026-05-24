@@ -208,35 +208,6 @@ class MarkdownTemplateBackend(TemplateBackend):
 
         return template_path
 
-    def _extract_blocks(self, template_content: str, context: dict[str, Any]) -> dict[str, str]:
-        """Extract and render template blocks.
-
-        Args:
-            template_content: Content of the template
-            context: Context to render the template with
-
-        Returns:
-            Dictionary containing the rendered subject and content blocks
-        """
-        blocks = {}
-
-        # Find subject block
-        subject_start = template_content.find("{% block subject %}")
-        if subject_start != -1:
-            subject_end = template_content.find("{% endblock %}", subject_start)
-            if subject_end != -1:
-                subject = template_content[subject_start + 19 : subject_end].strip()
-                # Render any template variables in subject
-                subject_template = Template(subject)
-                blocks["subject"] = subject_template.render(Context(context))
-                # Remove subject block from content
-                template_content = (
-                    template_content[:subject_start].strip() + template_content[subject_end + 13 :].strip()
-                )
-
-        blocks["content"] = template_content.strip()
-        return blocks
-
     def _generate_plain_text(self, html_content: str) -> str:
         """Generate plain text content from HTML.
 
@@ -325,7 +296,6 @@ class MarkdownTemplateBackend(TemplateBackend):
         except (
             TemplateDoesNotExist,
             TemplateSyntaxError,
-            BlockNotFound,
             MarkdownRenderError,
             CSSInliningError,
             ValueError,
