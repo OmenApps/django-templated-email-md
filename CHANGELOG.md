@@ -12,6 +12,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   with `--context` / `--context-file` for supplying template variables, `--open` to
   launch the result in a browser, `--part` to print a single rendered section to
   stdout, and `--watch` for automatic re-render on template file changes.
+- Dark-mode support: added `<meta name="color-scheme" content="light dark">` and
+  `<meta name="supported-color-schemes" content="light dark">` to `markdown_base.html`.
+- Dark-mode CSS: appended `@media (prefers-color-scheme: dark)` block to
+  `markdown_styles.css` overriding background (`#1a1a1a` / `#2a2a2a`), heading and body
+  text colours, link colour, button colours, footer text colour, and `hr` border colour.
+- `button.html` component partial: bulletproof table-based button parameterised with
+  `{{ url }}` and `{{ label }}`, usable via
+  `{% include "templated_email/components/button.html" with url="..." label="..." %}`.
+- `divider.html` component partial: full-width horizontal rule with inline `border-bottom`
+  styling for cross-client compatibility, usable via
+  `{% include "templated_email/components/divider.html" %}`.
+- `pyproject.toml` package-data updated to include `templates/templated_email/components/*`
+  so component partials are bundled in the built distribution.
 
 ## [2025.10.1]
 

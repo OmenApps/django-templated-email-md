@@ -606,3 +606,51 @@ python manage.py preview_email welcome_email --context '{"name": "Alice"}' --out
 The command polls the template file for changes every second and re-renders
 whenever its modification time advances. Keep a browser tab open to `preview.html`
 and refresh it manually (or use a live-reload browser extension) to see updates.
+
+## Components
+
+The package ships reusable HTML component partials that can be included from within any
+Markdown email template's `{% block content %}`. Because Django's template engine resolves
+`{% include %}` tags before the Markdown renderer runs, block-level HTML emitted by a
+component partial (separated from surrounding text by blank lines) passes through
+`markdown.markdown()` unchanged and appears correctly in the final email HTML.
+
+### Button
+
+The `button.html` partial renders a bulletproof, table-based button styled
+with the existing `.btn` / `.btn-primary` classes. Pass `url` and `label` via `with`:
+
+```django
+{% block content %}
+Please confirm your account by clicking the button below.
+
+{% include "templated_email/components/button.html" with url="https://example.com/confirm/abc123" label="Confirm Account" %}
+
+If you did not create an account, you can ignore this email.
+{% endblock %}
+```
+
+The blank lines before and after the `{% include %}` tag are required - they tell the
+Markdown parser to treat the emitted HTML as a block-level element and leave it untouched.
+
+### Divider
+
+The `divider.html` partial renders a full-width horizontal rule using a table row with an
+inline `border-bottom` style, which renders reliably across all major email clients:
+
+```django
+{% block content %}
+This is the first section of the email.
+
+{% include "templated_email/components/divider.html" %}
+
+This is the second section of the email.
+{% endblock %}
+```
+
+### Customising Components
+
+To override a shipped component, copy the partial from
+`src/templated_email_md/templates/templated_email/components/` into your own app's
+`templates/templated_email/components/` directory (ensuring your app is listed before
+`templated_email_md` in `INSTALLED_APPS`) and modify it as needed.

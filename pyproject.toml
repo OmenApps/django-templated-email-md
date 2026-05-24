@@ -82,7 +82,7 @@ dev-dependencies = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-templated_email_md = ["templates/templated_email/*", "locale/*", "py.typed"]
+templated_email_md = ["templates/templated_email/*", "templates/templated_email/components/*", "locale/*", "py.typed"]
 
 [tool.black]
 line-length = 120
