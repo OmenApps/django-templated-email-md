@@ -25,6 +25,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `{% include "templated_email/components/divider.html" %}`.
 - `pyproject.toml` package-data updated to include `templates/templated_email/components/*`
   so component partials are bundled in the built distribution.
+- Add `TEMPLATED_EMAIL_BRANDING` setting for zero-fork email branding (colors, font, logo) via a single Django settings dict
+- Optional HTML sanitization of the Markdown-rendered content block via the new
+  `TEMPLATED_EMAIL_SANITIZE` setting (default `False`). When enabled, uses the `nh3`
+  library to strip dangerous constructs such as `<script>` tags and event handler
+  attributes from rendered content before it is wrapped in the base template.
+- New `TEMPLATED_EMAIL_SANITIZE_KWARGS` setting to pass custom allowlist configuration
+  to `nh3.clean()` (e.g. to permit `class` attributes or additional URL schemes).
+- New optional package extra `[sanitize]`: `pip install django-templated-email-md[sanitize]`
+  installs `nh3>=0.2.18`. The base install is unchanged.
 
 ## [2025.10.1]
 

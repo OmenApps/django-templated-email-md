@@ -1142,3 +1142,93 @@ def test_divider_component(backend) -> None:
     # (premailer normalises #444444 to #444, so match the shortened form)
     assert "email-divider td" in response["html"]
     assert "border-bottom-color: #444" in response["html"]
+
+
+def test_sanitize_setting_default_is_false(backend) -> None:
+    """Test that TEMPLATED_EMAIL_SANITIZE defaults to False."""
+    assert backend.sanitize is False
+
+
+def test_sanitize_settings_read_from_django_settings() -> None:
+    """Test that TEMPLATED_EMAIL_SANITIZE and TEMPLATED_EMAIL_SANITIZE_KWARGS are read from settings."""
+    from django.test import override_settings
+
+    custom_kwargs = {"tags": {"p", "a", "strong", "em"}}
+
+    with override_settings(TEMPLATED_EMAIL_SANITIZE=True, TEMPLATED_EMAIL_SANITIZE_KWARGS=custom_kwargs):
+        new_backend = MarkdownTemplateBackend()
+        assert new_backend.sanitize is True
+        assert new_backend.sanitize_kwargs == custom_kwargs
+
+
+def test_sanitize_html_removes_script_tags() -> None:
+    """Test that _sanitize_html removes script tags and retains safe content."""
+    sanitizing_backend = MarkdownTemplateBackend()
+    dirty = "<p>Hello world</p><script>alert('xss')</script>"
+    result = sanitizing_backend._sanitize_html(dirty)
+    assert "<script>" not in result
+    assert "alert" not in result
+    assert "Hello world" in result
+
+
+def test_sanitize_html_fail_silently_returns_input_on_error() -> None:
+    """Test that _sanitize_html returns input unchanged when fail_silently=True and nh3 raises."""
+    from unittest.mock import patch
+
+    sanitizing_backend = MarkdownTemplateBackend(fail_silently=True)
+    dirty = "<p>test</p>"
+
+    with patch("templated_email_md.backend.nh3") as mock_nh3:
+        mock_nh3.clean.side_effect = RuntimeError("unexpected nh3 error")
+        result = sanitizing_backend._sanitize_html(dirty)
+
+    assert result == dirty
+
+
+def test_sanitize_html_raises_on_error_without_fail_silently() -> None:
+    """Test that _sanitize_html raises when fail_silently=False and nh3 raises."""
+    from unittest.mock import patch
+
+    sanitizing_backend = MarkdownTemplateBackend(fail_silently=False)
+
+    with patch("templated_email_md.backend.nh3") as mock_nh3:
+        mock_nh3.clean.side_effect = RuntimeError("unexpected nh3 error")
+        with pytest.raises(RuntimeError, match="unexpected nh3 error"):
+            sanitizing_backend._sanitize_html("<p>test</p>")
+
+
+def test_xss_content_present_without_sanitization(backend) -> None:
+    """Test that script tags survive rendering when TEMPLATED_EMAIL_SANITIZE is False (default).
+
+    This documents the current behavior: markdown passes raw HTML through, so a
+    script tag in the content block reaches the final HTML. Sanitization must be
+    explicitly enabled to prevent this.
+    """
+    result = backend._render_email("test_xss_content", {})
+    assert "<script>" in result["html"], "Expected <script> to be present in HTML when sanitization is off"
+
+
+def test_xss_content_removed_with_sanitization() -> None:
+    """Test that script tags are removed when TEMPLATED_EMAIL_SANITIZE=True."""
+    from django.test import override_settings
+
+    with override_settings(TEMPLATED_EMAIL_SANITIZE=True):
+        sanitizing_backend = MarkdownTemplateBackend()
+        result = sanitizing_backend._render_email("test_xss_content", {})
+
+    assert "<script>" not in result["html"], "Expected <script> to be absent from HTML when sanitization is on"
+    assert "Normal paragraph text" in result["html"], "Expected safe content to survive sanitization"
+    assert "More safe content here" in result["html"], "Expected safe content to survive sanitization"
+    assert result["subject"] == "XSS Test Email"
+
+
+def test_sanitize_html_raises_importerror_when_nh3_missing() -> None:
+    """_sanitize_html raises ImportError when nh3 is not installed, even with fail_silently=True."""
+    from unittest.mock import patch
+
+    # fail_silently=True must still raise ImportError (a missing optional dep is a
+    # misconfiguration; silently skipping requested sanitization would be unsafe)
+    backend = MarkdownTemplateBackend(fail_silently=True)
+    with patch("templated_email_md.backend.nh3", None):
+        with pytest.raises(ImportError, match="sanitize"):
+            backend._sanitize_html("<p>hi</p>")

@@ -190,6 +190,73 @@ TEMPLATED_EMAIL_HTML2TEXT_SETTINGS = {
 TEMPLATED_EMAIL_FAIL_SILENTLY = True
 ```
 
+## HTML Sanitization Settings
+
+> **Note:** HTML sanitization requires the optional `nh3` dependency. Install it with:
+>
+> ```bash
+> pip install django-templated-email-md[sanitize]
+> ```
+>
+> If `TEMPLATED_EMAIL_SANITIZE = True` but `nh3` is not installed, email sending will
+> raise `ImportError` - install the `[sanitize]` extra to resolve it. This error is
+> raised even when `TEMPLATED_EMAIL_FAIL_SILENTLY = True`, because silently skipping
+> requested sanitization would be a security risk.
+
+### `TEMPLATED_EMAIL_SANITIZE`
+- **Default:** `False`
+- **Required:** No
+- **Type:** Boolean
+- **Description:** When `True`, sanitizes the HTML produced from the Markdown `content`
+  block before it is wrapped in the base template. Uses the `nh3` library (Python
+  bindings for the Rust `ammonia` crate) to strip dangerous constructs such as
+  `<script>` tags, event handler attributes (`onclick`, etc.), and `javascript:` URLs.
+  Defaults to `False` for full backward compatibility - existing templates are unaffected
+  unless you explicitly opt in.
+
+  > **Important caveat:** `nh3`'s default allowlist is conservative. By default it
+  > strips `class` attributes and some table/button markup. Sanitization runs on the
+  > Markdown `content` fragment before it is wrapped in the base template, so the base
+  > template's own classes are never affected - only `class` attributes in raw HTML
+  > written directly in your `content` block (e.g. `<div class="foo">` placed inline
+  > in the Markdown source) will be stripped. If you use such markup, you must extend
+  > the allowlist via `TEMPLATED_EMAIL_SANITIZE_KWARGS`.
+  > Users who render fully trusted template markup (e.g. no user-supplied context
+  > values reach the content block) may prefer to leave sanitization off.
+
+- **Example:**
+```python
+TEMPLATED_EMAIL_SANITIZE = True
+```
+
+### `TEMPLATED_EMAIL_SANITIZE_KWARGS`
+- **Default:** `{}`
+- **Required:** No
+- **Type:** Dictionary
+- **Description:** Keyword arguments passed directly to `nh3.clean()`. Use this to
+  extend or restrict the default allowlists. Common keys include:
+  - `tags`: `set[str]` - allowed HTML tag names (overrides nh3 default allowlist).
+  - `attributes`: `dict[str, set[str]]` - maps tag names to sets of allowed attribute
+    names. Note that passing this key overrides nh3's entire default attribute
+    allowlist, so include all attributes you need (not just the additions).
+  - `url_schemes`: `set[str]` - allowed URL schemes (default includes `http`, `https`,
+    `mailto`).
+
+  Refer to the [nh3 documentation](https://nh3.readthedocs.io/) for the full list of
+  accepted keyword arguments.
+
+- **Example (allow `class` attribute on all elements):**
+```python
+TEMPLATED_EMAIL_SANITIZE = True
+TEMPLATED_EMAIL_SANITIZE_KWARGS = {
+    "attributes": {
+        "*": {"class"},
+        "a": {"href", "title", "class"},
+        "img": {"src", "alt", "class"},
+    }
+}
+```
+
 ## Complete Configuration Example
 
 Here's a complete example showing all settings with their default values:
@@ -227,6 +294,10 @@ TEMPLATED_EMAIL_HTML2TEXT_SETTINGS = {
 
 # Error Handling
 TEMPLATED_EMAIL_FAIL_SILENTLY = False
+
+# HTML Sanitization (requires: pip install django-templated-email-md[sanitize])
+TEMPLATED_EMAIL_SANITIZE = False
+TEMPLATED_EMAIL_SANITIZE_KWARGS = {}
 ```
 
 ## Notes

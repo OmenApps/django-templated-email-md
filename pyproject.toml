@@ -39,6 +39,9 @@ dependencies = [
     "premailer>=3.10",
 ]
 
+[project.optional-dependencies]
+sanitize = ["nh3>=0.2.18"]
+
 [project.urls]
 Homepage = "https://github.com/OmenApps/django-templated-email-md"
 Repository = "https://github.com/OmenApps/django-templated-email-md"
@@ -60,6 +63,7 @@ dev-dependencies = [
     "isort==7.0.0",
     "linkify-it-py==2.0.3",
     "myst-parser==4.0.1",
+    "nh3>=0.2.18",
     "nox[pbs]==2025.10.16",
     "pep8-naming==0.15.1",
     "pre-commit-hooks==6.0.0",

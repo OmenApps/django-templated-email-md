@@ -21,6 +21,11 @@ from templated_email.backends.vanilla_django import TemplateBackend
 from templated_email_md.exceptions import CSSInliningError
 from templated_email_md.exceptions import MarkdownRenderError
 
+try:
+    import nh3
+except ImportError:  # pragma: no cover
+    nh3 = None  # type: ignore[assignment]
+
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +97,8 @@ class MarkdownTemplateBackend(TemplateBackend):
             **DEFAULT_BRANDING,
             **getattr(settings, "TEMPLATED_EMAIL_BRANDING", {}),
         }
+        self.sanitize: bool = getattr(settings, "TEMPLATED_EMAIL_SANITIZE", False)
+        self.sanitize_kwargs: dict[str, Any] = getattr(settings, "TEMPLATED_EMAIL_SANITIZE_KWARGS", {})
 
     def send(
         self,
@@ -174,6 +181,39 @@ class MarkdownTemplateBackend(TemplateBackend):
             if self.fail_silently:
                 return content  # Return raw content if conversion fails
             raise MarkdownRenderError(f"Failed to render Markdown: {e}") from e
+
+    def _sanitize_html(self, html: str) -> str:
+        """Sanitize HTML content to remove potentially dangerous tags and attributes.
+
+        Uses the ``nh3`` library (Python bindings for the Rust ``ammonia`` crate).
+        Only called when ``self.sanitize`` is ``True``. ``nh3`` must be installed via
+        the ``sanitize`` optional extra::
+
+            pip install django-templated-email-md[sanitize]
+
+        Args:
+            html: HTML string to sanitize.
+
+        Returns:
+            Sanitized HTML string with dangerous constructs removed.
+
+        Raises:
+            ImportError: If ``nh3`` is not installed and sanitization is requested.
+            Exception: Re-raises any unexpected exception from ``nh3.clean`` when
+                ``fail_silently`` is ``False``.
+        """
+        if nh3 is None:
+            raise ImportError(
+                "HTML sanitization requires the 'nh3' package. "
+                "Install it with: pip install django-templated-email-md[sanitize]"
+            )
+        try:
+            return nh3.clean(html, **self.sanitize_kwargs)
+        except Exception as e:
+            logger.error("Failed to sanitize HTML: %s", e)
+            if self.fail_silently:
+                return html
+            raise
 
     def _inline_css(self, html: str, base_url: str = "") -> str:
         """Inline CSS styles in HTML content.
@@ -441,6 +481,9 @@ class MarkdownTemplateBackend(TemplateBackend):
                 raise
         # Remove comments from the final HTML message
         html_content = self._remove_comments(html_content)
+        # Optionally sanitize HTML to strip dangerous tags/attributes
+        if self.sanitize:
+            html_content = self._sanitize_html(html_content)
         return html_content
 
     def _get_plain_text_content_from_template(
