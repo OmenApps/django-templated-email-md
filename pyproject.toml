@@ -71,7 +71,7 @@ dev = [
     "pytest-cov==7.0.0",
     "pytest-django==4.11.1",
     "pytest==9.0.3",
-    "python-environ==0.4.54",
+    "django-environ==0.13.0",
     "pyupgrade==3.21.0",
     "ruff==0.15.14",
     "pip-audit>=2.7.3",

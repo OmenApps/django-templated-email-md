@@ -27,7 +27,7 @@ PYTHON_STABLE_VERSION = "3.14"
 PYTHON_VERSIONS = ["3.11", "3.12", "3.13", "3.14"]
 
 
-PACKAGE = "django_templated_email_md"
+PACKAGE = "templated_email_md"
 
 nox.needs_version = ">= 2024.4.15"
 nox.options.sessions = (
