@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- `preview_email` management command: renders any Markdown email template to a
+  self-contained tri-pane HTML preview file (HTML iframe panel + plain-text panel),
+  with `--context` / `--context-file` for supplying template variables, `--open` to
+  launch the result in a browser, `--part` to print a single rendered section to
+  stdout, and `--watch` for automatic re-render on template file changes.
 
 ## [2025.10.1]
 

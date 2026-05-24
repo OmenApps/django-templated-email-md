@@ -558,3 +558,51 @@ send_templated_mail(
     ],
 )
 ```
+
+## Email Preview Tool
+
+The `preview_email` management command renders any Markdown email template to a
+self-contained HTML file without sending an email. It is useful during development
+to inspect the final rendered output - including CSS-inlined HTML and plain text -
+directly in a browser.
+
+### Basic usage
+
+```bash
+python manage.py preview_email welcome_email --context '{"name": "Alice"}' --open
+```
+
+This renders `welcome_email.md`, writes `email_preview.html` in the current
+directory, and opens it in your default browser.
+
+### Options
+
+| Option | Description |
+|---|---|
+| `template_name` | Template name (without extension) to render. |
+| `--context JSON` | Inline JSON string used as the template context. |
+| `--context-file PATH` | Path to a JSON file used as the template context (`--context` wins if both are given). |
+| `--output PATH` / `-o PATH` | Output path for the preview file (default: `email_preview.html`). |
+| `--open` | Open the written file in the system default browser. |
+| `--part PART` | Print only one part to stdout: `html`, `plain`, `subject`, or `preheader`. |
+| `--watch` | Re-render automatically whenever the template file changes (Ctrl-C to stop). |
+
+### Print a single part
+
+```bash
+# Print just the subject line
+python manage.py preview_email welcome_email --context '{"name": "Alice"}' --part subject
+
+# Print the plain-text version
+python manage.py preview_email welcome_email --context '{"name": "Alice"}' --part plain
+```
+
+### Watch mode
+
+```bash
+python manage.py preview_email welcome_email --context '{"name": "Alice"}' --output preview.html --watch
+```
+
+The command polls the template file for changes every second and re-renders
+whenever its modification time advances. Keep a browser tab open to `preview.html`
+and refresh it manually (or use a live-reload browser extension) to see updates.

@@ -1,8 +1,14 @@
 """Test cases for the django-templated-email-md package."""
 
+import html as html_stdlib
+import io
+import os
+
 import pytest
 from django.conf import settings
 from django.core import mail
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.template import TemplateDoesNotExist
 from django.utils import translation
 from django.utils.translation import gettext as _
@@ -748,3 +754,244 @@ def test_markdown_import_error() -> None:
             backend._render_markdown("# Test content")
         
         assert "Extension 'invalid.extension' not found" in str(exc_info.value)
+
+
+def test_build_preview_page_returns_full_html_document():
+    """build_preview_page must return a string starting with <!DOCTYPE html>."""
+    from templated_email_md.preview import build_preview_page
+
+    result = build_preview_page(
+        subject="Hello World",
+        preheader="A short preview",
+        html_body="<p>Body</p>",
+        plain="Body",
+    )
+    assert result.startswith("<!DOCTYPE html>")
+
+
+def test_build_preview_page_contains_subject_and_preheader():
+    """build_preview_page must embed subject and preheader in the wrapper chrome."""
+    from templated_email_md.preview import build_preview_page
+
+    result = build_preview_page(
+        subject="My Subject",
+        preheader="My Preheader",
+        html_body="<p>x</p>",
+        plain="x",
+    )
+    assert "My Subject" in result
+    assert "My Preheader" in result
+
+
+def test_build_preview_page_html_escaped_in_srcdoc():
+    """HTML email content must be html.escape()'d before insertion into srcdoc."""
+    from templated_email_md.preview import build_preview_page
+
+    raw_html = '<p style="color:red">Hello & "World"</p>'
+    escaped = html_stdlib.escape(raw_html, quote=True)
+    result = build_preview_page(
+        subject="S",
+        preheader="P",
+        html_body=raw_html,
+        plain="Hello",
+    )
+    assert escaped in result
+    # The unescaped ampersand must NOT appear raw inside the srcdoc attribute
+    assert ' & "' not in result
+
+
+def test_build_preview_page_plain_text_appears():
+    """Plain text version must appear verbatim inside a <pre> element."""
+    from templated_email_md.preview import build_preview_page
+
+    result = build_preview_page(
+        subject="S",
+        preheader="P",
+        html_body="<p>x</p>",
+        plain="Plain text line one\nLine two",
+    )
+    assert "Plain text line one" in result
+    assert "Line two" in result
+
+
+def test_file_changed_returns_false_when_mtime_unchanged(tmp_path):
+    """file_changed must return (False, mtime) when file has not been modified."""
+    from templated_email_md.preview import file_changed
+
+    f = tmp_path / "tpl.md"
+    f.write_text("{% block content %}hi{% endblock %}")
+    mtime = f.stat().st_mtime
+    changed, new_mtime = file_changed(str(f), mtime)
+    assert changed is False
+    assert new_mtime == mtime
+
+
+def test_file_changed_returns_true_after_utime(tmp_path):
+    """file_changed must return (True, new_mtime) after the file's mtime advances."""
+    from templated_email_md.preview import file_changed
+
+    f = tmp_path / "tpl.md"
+    f.write_text("{% block content %}hi{% endblock %}")
+    mtime = f.stat().st_mtime
+    # Move mtime 10 seconds into the future
+    future = mtime + 10
+    os.utime(str(f), (future, future))
+    changed, new_mtime = file_changed(str(f), mtime)
+    assert changed is True
+    assert new_mtime == future
+
+
+def test_preview_email_management_command_is_discoverable():
+    """Django must be able to load the preview_email management command."""
+    from django.core.management import load_command_class
+
+    cmd_class = load_command_class("templated_email_md", "preview_email")
+    assert cmd_class is not None
+
+
+def test_preview_email_writes_html_file(tmp_path):
+    """preview_email must write a full HTML document containing rendered content."""
+    output_file = tmp_path / "out.html"
+    call_command(
+        "preview_email",
+        "test_message",
+        "--context",
+        '{"name": "Preview User"}',
+        "--output",
+        str(output_file),
+    )
+    assert output_file.exists(), "Output file was not created"
+    content = output_file.read_text(encoding="utf-8")
+    assert content.startswith("<!DOCTYPE html>"), "Output is not a full HTML document"
+    assert "Preview User" in content, "Context variable not rendered into output"
+    assert "Test Email" in content, "Subject not present in output"
+
+
+def test_preview_email_part_subject_prints_to_stdout():
+    """preview_email --part subject must print the subject to stdout."""
+    stdout_buf = io.StringIO()
+    call_command(
+        "preview_email",
+        "test_message",
+        "--context",
+        '{"name": "Preview User"}',
+        "--part",
+        "subject",
+        stdout=stdout_buf,
+    )
+    output = stdout_buf.getvalue()
+    assert "Test Email" in output, f"Expected 'Test Email' in stdout, got: {output!r}"
+
+
+def test_preview_email_part_plain_prints_to_stdout():
+    """preview_email --part plain must print the plain text body to stdout."""
+    stdout_buf = io.StringIO()
+    call_command(
+        "preview_email",
+        "test_message",
+        "--context",
+        '{"name": "Preview User"}',
+        "--part",
+        "plain",
+        stdout=stdout_buf,
+    )
+    output = stdout_buf.getvalue()
+    assert "Preview User" in output, f"Expected rendered name in plain output, got: {output!r}"
+
+
+def test_preview_email_raises_command_error_for_missing_template():
+    """preview_email must raise CommandError when the template does not exist."""
+    with pytest.raises(CommandError):
+        call_command(
+            "preview_email",
+            "nonexistent_template_xyz",
+        )
+
+
+def test_preview_email_context_file(tmp_path):
+    """preview_email --context-file must load context from a JSON file."""
+    context_file = tmp_path / "ctx.json"
+    context_file.write_text('{"name": "FileUser"}', encoding="utf-8")
+    output_file = tmp_path / "out_ctx_file.html"
+    call_command(
+        "preview_email",
+        "test_message",
+        "--context-file",
+        str(context_file),
+        "--output",
+        str(output_file),
+    )
+    content = output_file.read_text(encoding="utf-8")
+    assert "FileUser" in content
+
+
+def test_preview_email_inline_context_wins_over_context_file(tmp_path):
+    """Inline --context must take precedence over --context-file when both supplied."""
+    context_file = tmp_path / "ctx.json"
+    context_file.write_text('{"name": "FileUser"}', encoding="utf-8")
+    output_file = tmp_path / "out_precedence.html"
+    call_command(
+        "preview_email",
+        "test_message",
+        "--context",
+        '{"name": "InlineUser"}',
+        "--context-file",
+        str(context_file),
+        "--output",
+        str(output_file),
+    )
+    content = output_file.read_text(encoding="utf-8")
+    assert "InlineUser" in content
+    assert "FileUser" not in content
+
+
+def test_watch_render_once_round_trip(tmp_path):
+    """A single _render + _write_preview cycle must produce correct output.
+
+    This exercises the watch-mode code path without entering the infinite loop,
+    confirming that re-rendering after a file change produces a valid preview.
+    """
+    output_file = tmp_path / "watch_out.html"
+
+    # Initial render
+    call_command(
+        "preview_email",
+        "test_message",
+        "--context",
+        '{"name": "WatchUser"}',
+        "--output",
+        str(output_file),
+    )
+    first_content = output_file.read_text(encoding="utf-8")
+    assert "WatchUser" in first_content
+
+    # Simulate re-render by calling call_command again (as --watch would do internally)
+    call_command(
+        "preview_email",
+        "test_message",
+        "--context",
+        '{"name": "WatchUserV2"}',
+        "--output",
+        str(output_file),
+    )
+    second_content = output_file.read_text(encoding="utf-8")
+    assert "WatchUserV2" in second_content
+    assert second_content.startswith("<!DOCTYPE html>")
+
+
+def test_preview_email_invalid_json_raises_command_error():
+    """preview_email --context with invalid JSON must raise CommandError."""
+    with pytest.raises(CommandError):
+        call_command("preview_email", "test_message", "--context", "{bad json")
+
+
+def test_preview_email_missing_context_file_raises_command_error(tmp_path):
+    """preview_email --context-file pointing at a nonexistent path must raise CommandError."""
+    with pytest.raises(CommandError):
+        call_command("preview_email", "test_message", "--context-file", str(tmp_path / "nope.json"))
+
+
+def test_preview_email_nondict_context_raises_command_error():
+    """preview_email --context with a non-object JSON value must raise CommandError."""
+    with pytest.raises(CommandError):
+        call_command("preview_email", "test_message", "--context", "[1, 2, 3]")
