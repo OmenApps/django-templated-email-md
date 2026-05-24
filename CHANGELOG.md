@@ -34,6 +34,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   to `nh3.clean()` (e.g. to permit `class` attributes or additional URL schemes).
 - New optional package extra `[sanitize]`: `pip install django-templated-email-md[sanitize]`
   installs `nh3>=0.2.18`. The base install is unchanged.
+- **Render caching**: `MarkdownTemplateBackend` now supports optional caching of
+  the full email render result (HTML, plain text, subject, preheader) via Django's
+  cache framework. Controlled by three new settings:
+  `TEMPLATED_EMAIL_CACHE_RENDERED` (default `False`),
+  `TEMPLATED_EMAIL_CACHE_TIMEOUT` (default `300`), and
+  `TEMPLATED_EMAIL_CACHE_ALIAS` (default `"default"`). The cache key is a
+  deterministic SHA-256 hash of the template name, context, language, and base
+  URL. Non-serializable contexts are silently skipped.
+- **`asend` async method**: `MarkdownTemplateBackend.asend(*args, **kwargs)`
+  wraps the synchronous `send` via `asgiref.sync.sync_to_async` so it can be
+  awaited from async Django views and task queues. No new dependencies - uses
+  `asgiref`, which is already a transitive dependency of Django.
 
 ## [2025.10.1]
 

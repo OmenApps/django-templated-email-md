@@ -654,3 +654,33 @@ To override a shipped component, copy the partial from
 `src/templated_email_md/templates/templated_email/components/` into your own app's
 `templates/templated_email/components/` directory (ensuring your app is listed before
 `templated_email_md` in `INSTALLED_APPS`) and modify it as needed.
+
+## Async Sending
+
+`MarkdownTemplateBackend` provides an `asend` coroutine method that wraps the
+synchronous `send` in a thread via `asgiref.sync.sync_to_async`. This lets you
+await email sending from async Django views, ASGI middleware, or async task
+queues without blocking the event loop.
+
+```python
+# views.py (async view)
+from templated_email_md.backend import MarkdownTemplateBackend
+
+async def welcome_view(request):
+    backend = MarkdownTemplateBackend()
+    await backend.asend(
+        template_name="welcome",
+        from_email="hello@example.com",
+        recipient_list=[request.user.email],
+        context={"user": request.user},
+    )
+    ...
+```
+
+`asend` accepts exactly the same arguments as `send`. The full render pipeline
+(Markdown conversion, CSS inlining, plain text generation) and SMTP delivery run
+in a thread pool managed by `asgiref`, so the async event loop is never blocked.
+
+> **Note:** `asend` is a thin wrapper - it does not add async-native SMTP
+> support. For high-throughput async email delivery, consider a task queue such
+> as Celery or Django-Q with `asend` as the async entry point.

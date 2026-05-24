@@ -298,6 +298,75 @@ TEMPLATED_EMAIL_FAIL_SILENTLY = False
 # HTML Sanitization (requires: pip install django-templated-email-md[sanitize])
 TEMPLATED_EMAIL_SANITIZE = False
 TEMPLATED_EMAIL_SANITIZE_KWARGS = {}
+
+# Render Caching
+TEMPLATED_EMAIL_CACHE_RENDERED = False
+TEMPLATED_EMAIL_CACHE_TIMEOUT = 300
+TEMPLATED_EMAIL_CACHE_ALIAS = "default"
+```
+
+## Render Caching
+
+The backend can cache the result of the full render pipeline (Markdown to HTML to
+CSS inlining to plain text) in Django's cache framework. Caching is **off by
+default** to preserve the existing behaviour.
+
+### `TEMPLATED_EMAIL_CACHE_RENDERED`
+
+| Type | Default |
+|------|---------|
+| `bool` | `False` |
+
+Set to `True` to enable render caching. When enabled, the backend stores the
+rendered `{"html", "plain", "subject", "preheader"}` dict in the cache under a
+deterministic SHA-256 key. Subsequent renders with identical template name,
+context, language, and base URL will be served from the cache, skipping the
+expensive `premailer.transform` call.
+
+The cache key incorporates the template name, context, active language, base
+URL, and all rendering-relevant settings - markdown extensions, html2text
+settings, sanitize flags, and branding. A change to any of these settings
+produces a different cache key, so cached HTML is never served after a settings
+change.
+
+**Note:** Only contexts and settings whose values are JSON-serializable are
+cached. If the context or `TEMPLATED_EMAIL_SANITIZE_KWARGS` contains values
+that are not JSON-serializable (e.g. a `set` used as an nh3 allowlist, or a
+model instance), caching is skipped for that call and the email is rendered
+normally - this is a safe fallback, not an error.
+
+### `TEMPLATED_EMAIL_CACHE_TIMEOUT`
+
+| Type | Default |
+|------|---------|
+| `int` | `300` |
+
+Cache TTL in seconds. Passed directly to Django's `cache.set(key, value,
+timeout)`. Set to `None` for a non-expiring entry (if the cache backend
+supports it).
+
+### `TEMPLATED_EMAIL_CACHE_ALIAS`
+
+| Type | Default |
+|------|---------|
+| `str` | `"default"` |
+
+The Django cache alias to use. Must be a key defined in `settings.CACHES`.
+
+### Example
+
+```python
+# settings.py
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+    }
+}
+
+TEMPLATED_EMAIL_CACHE_RENDERED = True
+TEMPLATED_EMAIL_CACHE_TIMEOUT = 600   # 10 minutes
+TEMPLATED_EMAIL_CACHE_ALIAS = "default"
 ```
 
 ## Notes

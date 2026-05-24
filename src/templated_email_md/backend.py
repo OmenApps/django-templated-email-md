@@ -1,5 +1,7 @@
 """Backend that uses Django templates and allows writing email content in Markdown."""
 
+import hashlib
+import json
 import logging
 import re
 from typing import Any
@@ -7,12 +9,15 @@ from typing import Any
 import html2text
 import markdown
 import premailer
+from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.core.cache import caches
 from django.template import Context
 from django.template import Template
 from django.template import TemplateDoesNotExist
 from django.template import TemplateSyntaxError
 from django.template.loader import get_template
+from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 from render_block import BlockNotFound
 from render_block import render_block_to_string
@@ -48,6 +53,11 @@ class MarkdownTemplateBackend(TemplateBackend):
 
     It renders the Markdown into HTML, wraps it with a base template, and inlines CSS styling.
     The plain text version is generated from the final HTML using html2text.
+
+    Cache settings (read from Django settings):
+        TEMPLATED_EMAIL_CACHE_RENDERED (bool): Enable render result caching. Default False.
+        TEMPLATED_EMAIL_CACHE_TIMEOUT (int): Cache TTL in seconds. Default 300.
+        TEMPLATED_EMAIL_CACHE_ALIAS (str): Django cache alias to use. Default "default".
     """
 
     def __init__(
@@ -99,6 +109,9 @@ class MarkdownTemplateBackend(TemplateBackend):
         }
         self.sanitize: bool = getattr(settings, "TEMPLATED_EMAIL_SANITIZE", False)
         self.sanitize_kwargs: dict[str, Any] = getattr(settings, "TEMPLATED_EMAIL_SANITIZE_KWARGS", {})
+        self.cache_rendered: bool = getattr(settings, "TEMPLATED_EMAIL_CACHE_RENDERED", False)
+        self.cache_timeout: int = getattr(settings, "TEMPLATED_EMAIL_CACHE_TIMEOUT", 300)
+        self.cache_alias: str = getattr(settings, "TEMPLATED_EMAIL_CACHE_ALIAS", "default")
 
     def send(
         self,
@@ -161,6 +174,105 @@ class MarkdownTemplateBackend(TemplateBackend):
                 context["_base_url"] = original_base_url
             else:
                 context.pop("_base_url", None)
+
+    async def asend(self, *args: Any, **kwargs: Any) -> Any:
+        """Send an email asynchronously by wrapping the synchronous :meth:`send`.
+
+        Offloads the blocking render pipeline (Markdown conversion, CSS inlining
+        via Premailer, html2text) and SMTP delivery to a thread pool via
+        :func:`asgiref.sync.sync_to_async`, making it safe to ``await`` from
+        async Django views, ASGI middleware, or async task queues.
+
+        ``thread_sensitive=True`` is used because :meth:`send` may perform ORM
+        writes (e.g. when ``create_link=True``, django-templated-email persists
+        a record), and thread-sensitive execution keeps that compatible with
+        Django's per-thread database connections.
+
+        All positional and keyword arguments are forwarded unchanged to
+        :meth:`send`. See :meth:`send` for the full parameter reference.
+
+        Args:
+            args: Positional arguments forwarded to :meth:`send`.
+            kwargs: Keyword arguments forwarded to :meth:`send`.
+
+        Returns:
+            Any: The return value of :meth:`send` (typically ``None`` under the
+            test email backend, matching Django's locmem backend convention).
+        """
+        return await sync_to_async(self.send, thread_sensitive=True)(*args, **kwargs)
+
+    def _render_cache_key(
+        self,
+        template_name: str | list | tuple,
+        context: dict[str, Any],
+        template_dir: str | None,
+        file_extension: str | None,
+    ) -> str | None:
+        """Build a deterministic SHA-256 cache key for a rendered email.
+
+        The key encodes: template name, template_dir, file_extension, base HTML
+        template name, active language, resolved base_url, and a JSON dump of
+        context (with the private ``_base_url`` key excluded). It also encodes
+        all rendering-relevant settings (markdown extensions, html2text settings,
+        sanitize flags, branding, template suffix, and template prefix) so that
+        a settings change produces a different key and does not serve stale
+        cached HTML.
+
+        Only JSON-serializable contexts and settings are cached. If ``json.dumps``
+        raises ``TypeError`` or ``ValueError`` (e.g. the context contains a plain
+        ``object()``, or ``sanitize_kwargs`` contains a ``set``), this method
+        returns ``None`` to signal that the result should not be cached for that
+        call (safe fallback - caching is simply skipped).
+
+        Args:
+            template_name: The Markdown template name or list of names.
+            context: The render context dict. The ``_base_url`` key is handled
+                separately and excluded from the context portion of the hash.
+            template_dir: Optional template directory override.
+            file_extension: Optional file extension override.
+
+        Returns:
+            A ``"templated_email_md:render:<hex-digest>"`` string when the
+            context is serializable, or ``None`` when it is not.
+        """
+        # Normalise template_name to a stable JSON-serializable form
+        if isinstance(template_name, (list, tuple)):
+            normalised_name = list(template_name)
+        else:
+            normalised_name = template_name
+
+        # _base_url is injected by send() and must be part of the key (different
+        # base URLs produce different inlined CSS), but it must NOT appear in the
+        # context portion (to keep context-hash stable across send() calls).
+        base_url_for_key = context.get("_base_url", self.base_url)
+
+        # Build context copy without the private key
+        context_for_hash = {k: v for k, v in context.items() if k != "_base_url"}
+
+        payload = {
+            "template_name": normalised_name,
+            "template_dir": template_dir,
+            "file_extension": file_extension,
+            "base_html_template": self.base_html_template,
+            "language": get_language(),
+            "base_url": base_url_for_key,
+            "context": context_for_hash,
+            "markdown_extensions": self.markdown_extensions,
+            "html2text_settings": self.html2text_settings,
+            "sanitize": self.sanitize,
+            "sanitize_kwargs": self.sanitize_kwargs,
+            "branding": self.branding,
+            "template_suffix": file_extension or self.template_suffix,
+            "template_prefix": template_dir or (self.template_prefix or ""),
+        }
+
+        try:
+            serialised = json.dumps(payload, sort_keys=True)
+        except (TypeError, ValueError):
+            return None
+
+        digest = hashlib.sha256(serialised.encode()).hexdigest()
+        return f"templated_email_md:render:{digest}"
 
     def _render_markdown(self, content: str) -> str:
         """Convert Markdown content to HTML.
@@ -289,7 +401,7 @@ class MarkdownTemplateBackend(TemplateBackend):
 
         return h.handle(html_content).strip()
 
-    def _render_email(
+    def _render_email_uncached(
         self,
         template_name: str | list | tuple,
         context: dict[str, Any],
@@ -298,24 +410,38 @@ class MarkdownTemplateBackend(TemplateBackend):
     ) -> dict[str, str]:
         """Render the email content using the Markdown template and base HTML template.
 
+        This is the raw, non-cached render path. Callers should prefer
+        :meth:`_render_email`, which applies caching when
+        ``TEMPLATED_EMAIL_CACHE_RENDERED`` is enabled.
+
         Args:
-            template_name (str or list): The name of the Markdown template to render.
-            context (dict): The context to render the template with.
-            template_dir (str): The directory to look for the template in.
-            file_extension (str): The file extension of the template file.
+            template_name: The name of the Markdown template to render, or a list
+                of names (first found is used).
+            context: The context dict to render the template with.
+            template_dir: Optional directory to look for the template in.
+            file_extension: Optional file extension override.
 
         Returns:
-            Dictionary containing the rendered HTML, plain text, and subject.
+            Dictionary with keys ``html``, ``plain``, ``subject``, and
+            ``preheader``.
 
         Raises:
-            TemplateDoesNotExist: If the specified template cannot be found.
-            TemplateSyntaxError: If the template contains invalid syntax.
-            MarkdownRenderError: If Markdown conversion fails.
-            CSSInliningError: If CSS inlining fails.
-            ValueError: If an invalid value is encountered during rendering.
-            AttributeError: If an attribute access fails during rendering.
-            TypeError: If a type error occurs during rendering.
-            OSError: If a filesystem error occurs while loading resources.
+            TemplateDoesNotExist: If the template cannot be found and
+                ``fail_silently`` is False.
+            TemplateSyntaxError: If the template contains invalid syntax and
+                ``fail_silently`` is False.
+            MarkdownRenderError: If Markdown conversion fails and
+                ``fail_silently`` is False.
+            CSSInliningError: If CSS inlining fails and ``fail_silently`` is
+                False.
+            ValueError: If an invalid value is encountered during rendering and
+                ``fail_silently`` is False.
+            AttributeError: If an attribute error occurs during rendering and
+                ``fail_silently`` is False.
+            TypeError: If a type error occurs during rendering and
+                ``fail_silently`` is False.
+            OSError: If a filesystem error occurs while loading resources and
+                ``fail_silently`` is False.
         """
         fallback_content = _("Email template rendering failed.")
 
@@ -379,6 +505,54 @@ class MarkdownTemplateBackend(TemplateBackend):
                     "preheader": self.default_preheader,
                 }
             raise
+
+    def _render_email(
+        self,
+        template_name: str | list | tuple,
+        context: dict[str, Any],
+        template_dir: str | None = None,
+        file_extension: str | None = None,
+    ) -> dict[str, str]:
+        """Render the email content, using the render cache when enabled.
+
+        When ``TEMPLATED_EMAIL_CACHE_RENDERED`` is ``False`` (the default),
+        this method is a transparent pass-through to
+        :meth:`_render_email_uncached`. When caching is enabled, a
+        deterministic SHA-256 key is computed from the template name, context,
+        and other render parameters. If the key is already present in the
+        configured cache, the cached dict is returned immediately, skipping the
+        expensive Markdown-to-HTML + CSS-inlining pipeline. If the context is
+        not JSON-serializable, the result is never cached (safe fallback).
+
+        Args:
+            template_name: The name of the Markdown template to render, or a list
+                of names (first found is used).
+            context: The context dict to render the template with.
+            template_dir: Optional directory to look for the template in.
+            file_extension: Optional file extension override.
+
+        Returns:
+            Dictionary with keys ``html``, ``plain``, ``subject``, and
+            ``preheader``.
+        """
+        if not self.cache_rendered:
+            return self._render_email_uncached(template_name, context, template_dir, file_extension)
+
+        key = self._render_cache_key(template_name, context, template_dir, file_extension)
+        if key is None:
+            return self._render_email_uncached(template_name, context, template_dir, file_extension)
+
+        cache = caches[self.cache_alias]
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+
+        result = self._render_email_uncached(template_name, context, template_dir, file_extension)
+        # Do not cache the fail_silently fallback: a transient failure must not be
+        # served as cached error content for the rest of the cache timeout.
+        if not (self.fail_silently and result.get("html") == _("Email template rendering failed.")):
+            cache.set(key, result, self.cache_timeout)
+        return result
 
     def _get_subject_from_template(self, template_path: str, context: dict[str, Any]) -> str | None:
         """Extract subject from template block.

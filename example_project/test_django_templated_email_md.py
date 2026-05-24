@@ -1,12 +1,18 @@
 """Test cases for the django-templated-email-md package."""
 
+import asyncio
 import html as html_stdlib
 import io
 import os
 
+from unittest.mock import patch
+
+from django.test import override_settings
+
 import pytest
 from django.conf import settings
 from django.core import mail
+from django.core.cache import caches
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.template import TemplateDoesNotExist
@@ -1232,3 +1238,288 @@ def test_sanitize_html_raises_importerror_when_nh3_missing() -> None:
     with patch("templated_email_md.backend.nh3", None):
         with pytest.raises(ImportError, match="sanitize"):
             backend._sanitize_html("<p>hi</p>")
+
+
+def test_cache_settings_defaults():
+    """Backend reads cache settings with correct defaults when none are set."""
+    backend = MarkdownTemplateBackend()
+    assert backend.cache_rendered is False
+    assert backend.cache_timeout == 300
+    assert backend.cache_alias == "default"
+
+
+def test_cache_settings_custom():
+    """Backend reads custom cache settings from Django settings."""
+    from django.test import override_settings
+
+    with override_settings(
+        TEMPLATED_EMAIL_CACHE_RENDERED=True,
+        TEMPLATED_EMAIL_CACHE_TIMEOUT=600,
+        TEMPLATED_EMAIL_CACHE_ALIAS="sessions",
+    ):
+        new_backend = MarkdownTemplateBackend()
+        assert new_backend.cache_rendered is True
+        assert new_backend.cache_timeout == 600
+        assert new_backend.cache_alias == "sessions"
+
+
+def test_render_cache_key_deterministic():
+    """Same inputs always produce the same cache key."""
+    backend = MarkdownTemplateBackend()
+    key1 = backend._render_cache_key("test_message", {"name": "Alice", "_base_url": ""}, None, None)
+    key2 = backend._render_cache_key("test_message", {"name": "Alice", "_base_url": ""}, None, None)
+    assert key1 is not None
+    assert key1 == key2
+
+
+def test_render_cache_key_differs_on_context_change():
+    """Different context values produce different cache keys."""
+    backend = MarkdownTemplateBackend()
+    key_alice = backend._render_cache_key("test_message", {"name": "Alice"}, None, None)
+    key_bob = backend._render_cache_key("test_message", {"name": "Bob"}, None, None)
+    assert key_alice is not None
+    assert key_bob is not None
+    assert key_alice != key_bob
+
+
+def test_render_cache_key_differs_on_template_name_change():
+    """Different template names produce different cache keys."""
+    backend = MarkdownTemplateBackend()
+    key1 = backend._render_cache_key("test_message", {"name": "Alice"}, None, None)
+    key2 = backend._render_cache_key("other_template", {"name": "Alice"}, None, None)
+    assert key1 != key2
+
+
+def test_render_cache_key_excludes_base_url_from_context_hash():
+    """_base_url is excluded from the context JSON hash (it is hashed separately)."""
+    backend = MarkdownTemplateBackend()
+    # Same logical context, one has _base_url injected by send(), one does not --
+    # the resulting key should differ because _base_url is handled as a separate field.
+    key_with = backend._render_cache_key(
+        "test_message", {"name": "Alice", "_base_url": "http://example.com"}, None, None
+    )
+    key_without = backend._render_cache_key(
+        "test_message", {"name": "Alice", "_base_url": "different"}, None, None
+    )
+    # Keys differ because _base_url is included in the hash as a SEPARATE field
+    # (not via the context dict), so changing it still changes the key.
+    assert key_with != key_without
+
+
+def test_render_cache_key_returns_none_for_nonserializable_context():
+    """Non-JSON-serializable context values cause _render_cache_key to return None."""
+    backend = MarkdownTemplateBackend()
+    # plain object() cannot be JSON-serialized without default=str
+    key = backend._render_cache_key("test_message", {"obj": object()}, None, None)
+    assert key is None
+
+
+def test_render_cache_key_has_correct_prefix():
+    """Cache key starts with the expected prefix."""
+    backend = MarkdownTemplateBackend()
+    key = backend._render_cache_key("test_message", {"name": "Alice"}, None, None)
+    assert key is not None
+    assert key.startswith("templated_email_md:render:")
+
+
+def test_render_cache_key_list_template_name():
+    """A list template_name is handled without raising."""
+    backend = MarkdownTemplateBackend()
+    key = backend._render_cache_key(["test_message", "fallback"], {"name": "Alice"}, None, None)
+    assert key is not None
+    assert key.startswith("templated_email_md:render:")
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    TEMPLATED_EMAIL_CACHE_RENDERED=False,
+)
+def test_render_email_caching_off_calls_uncached_twice():
+    """With caching OFF, _render_email_uncached is called every time."""
+    backend = MarkdownTemplateBackend()
+    mock_result = {"html": "<p>Hello Alice!</p>", "plain": "Hello Alice!", "subject": "Test Email", "preheader": ""}
+
+    with patch.object(backend, "_render_email_uncached", return_value=mock_result) as mock_uncached:
+        backend._render_email("test_message", {"name": "Alice"})
+        backend._render_email("test_message", {"name": "Alice"})
+        assert mock_uncached.call_count == 2
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    TEMPLATED_EMAIL_CACHE_RENDERED=True,
+    TEMPLATED_EMAIL_CACHE_TIMEOUT=300,
+    TEMPLATED_EMAIL_CACHE_ALIAS="default",
+)
+def test_render_email_caching_on_calls_uncached_once():
+    """With caching ON, _render_email_uncached is called only on the first render; the second is a cache hit."""
+    caches["default"].clear()
+    backend = MarkdownTemplateBackend()
+    mock_result = {"html": "<p>Hello Alice!</p>", "plain": "Hello Alice!", "subject": "Test Email", "preheader": ""}
+
+    with patch.object(backend, "_render_email_uncached", return_value=mock_result) as mock_uncached:
+        result1 = backend._render_email("test_message", {"name": "Alice"})
+        result2 = backend._render_email("test_message", {"name": "Alice"})
+        assert mock_uncached.call_count == 1
+        assert result1 == result2 == mock_result
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    TEMPLATED_EMAIL_CACHE_RENDERED=True,
+    TEMPLATED_EMAIL_CACHE_TIMEOUT=300,
+    TEMPLATED_EMAIL_CACHE_ALIAS="default",
+)
+def test_render_email_caching_on_different_context_calls_uncached_twice():
+    """With caching ON, different context values produce separate cache entries."""
+    caches["default"].clear()
+    backend = MarkdownTemplateBackend()
+    mock_alice = {"html": "<p>Hello Alice!</p>", "plain": "Hello Alice!", "subject": "Test Email", "preheader": ""}
+    mock_bob = {"html": "<p>Hello Bob!</p>", "plain": "Hello Bob!", "subject": "Test Email", "preheader": ""}
+
+    side_effects = [mock_alice, mock_bob]
+    with patch.object(backend, "_render_email_uncached", side_effect=side_effects) as mock_uncached:
+        result_alice = backend._render_email("test_message", {"name": "Alice"})
+        result_bob = backend._render_email("test_message", {"name": "Bob"})
+        assert mock_uncached.call_count == 2
+        assert result_alice == mock_alice
+        assert result_bob == mock_bob
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    TEMPLATED_EMAIL_CACHE_RENDERED=True,
+    TEMPLATED_EMAIL_CACHE_TIMEOUT=300,
+    TEMPLATED_EMAIL_CACHE_ALIAS="default",
+)
+def test_render_email_caching_nonserializable_context_bypasses_cache():
+    """Non-serializable context (None key from _render_cache_key) skips the cache entirely."""
+    backend = MarkdownTemplateBackend()
+    mock_result = {"html": "<p>hi</p>", "plain": "hi", "subject": "Test Email", "preheader": ""}
+
+    with patch.object(backend, "_render_email_uncached", return_value=mock_result) as mock_uncached:
+        # object() is not JSON-serializable -> key is None -> always calls uncached
+        backend._render_email("test_message", {"obj": object()})
+        backend._render_email("test_message", {"obj": object()})
+        assert mock_uncached.call_count == 2
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    TEMPLATED_EMAIL_CACHE_RENDERED=True,
+    TEMPLATED_EMAIL_CACHE_TIMEOUT=300,
+    TEMPLATED_EMAIL_CACHE_ALIAS="default",
+)
+def test_render_email_caching_on_output_correct():
+    """With caching ON, the output for test_message is identical to a direct uncached call and caching actually occurs."""
+    caches["default"].clear()
+    backend = MarkdownTemplateBackend()
+    context = {"name": "CacheUser", "_base_url": ""}
+
+    with patch.object(backend, "_render_email_uncached", wraps=backend._render_email_uncached) as spy:
+        result1 = backend._render_email("test_message", context)
+        result2 = backend._render_email("test_message", context)
+        # _render_email_uncached must have been called exactly once (second is a cache hit)
+        assert spy.call_count == 1
+
+    assert result1 == result2
+    assert "CacheUser" in result1["html"]
+    assert result1["subject"] == "Test Email"
+    # Confirm the entry actually exists in the cache
+    key = backend._render_cache_key("test_message", context, None, None)
+    assert key is not None
+    assert caches["default"].get(key) is not None
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    TEMPLATED_EMAIL_CACHE_RENDERED=True,
+    TEMPLATED_EMAIL_CACHE_TIMEOUT=300,
+    TEMPLATED_EMAIL_CACHE_ALIAS="default",
+)
+def test_render_email_caching_does_not_cache_fallback():
+    """With caching ON and fail_silently=True, a failed render is not cached (fallback not persisted)."""
+    caches["default"].clear()
+    backend = MarkdownTemplateBackend(fail_silently=True)
+
+    with patch.object(backend, "_render_email_uncached", wraps=backend._render_email_uncached) as spy:
+        result1 = backend._render_email("nonexistent_template_xyz", {})
+        result2 = backend._render_email("nonexistent_template_xyz", {})
+        # Both renders must call through to uncached because the fallback must not be cached
+        assert spy.call_count == 2
+
+    # Both results should contain the fallback text
+    assert "Email template rendering failed." in result1["html"]
+    assert "Email template rendering failed." in result2["html"]
+
+
+def test_render_cache_key_differs_on_branding():
+    """Cache keys differ when TEMPLATED_EMAIL_BRANDING differs between backends."""
+    with override_settings(TEMPLATED_EMAIL_BRANDING={"primary_color": "#aaaaaa"}):
+        backend_a = MarkdownTemplateBackend()
+        key_a = backend_a._render_cache_key("test_message", {"name": "Alice"}, None, None)
+
+    with override_settings(TEMPLATED_EMAIL_BRANDING={"primary_color": "#bbbbbb"}):
+        backend_b = MarkdownTemplateBackend()
+        key_b = backend_b._render_cache_key("test_message", {"name": "Alice"}, None, None)
+
+    assert key_a is not None
+    assert key_b is not None
+    assert key_a != key_b
+
+
+def test_render_cache_key_differs_on_sanitize():
+    """Cache keys differ when TEMPLATED_EMAIL_SANITIZE differs between backends."""
+    with override_settings(TEMPLATED_EMAIL_SANITIZE=False):
+        backend_off = MarkdownTemplateBackend()
+        key_off = backend_off._render_cache_key("test_message", {"name": "Alice"}, None, None)
+
+    with override_settings(TEMPLATED_EMAIL_SANITIZE=True):
+        backend_on = MarkdownTemplateBackend()
+        key_on = backend_on._render_cache_key("test_message", {"name": "Alice"}, None, None)
+
+    assert key_off is not None
+    assert key_on is not None
+    assert key_off != key_on
+
+
+@pytest.mark.django_db
+def test_asend_sends_email():
+    """The asend method delivers an email via the sync send path, awaitable from sync test code."""
+    backend = MarkdownTemplateBackend()
+
+    asyncio.run(
+        backend.asend(
+            template_name="test_message",
+            from_email="from@example.com",
+            recipient_list=["to@example.com"],
+            context={"name": "Async User"},
+        )
+    )
+
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == ["to@example.com"]
+    assert mail.outbox[0].from_email == "from@example.com"
+    # mail.outbox[0].body is the plain text part
+    assert "Async User" in mail.outbox[0].body
+
+
+@pytest.mark.django_db
+def test_asend_returns_same_result_as_send():
+    """The asend method returns the same value as the synchronous send method."""
+    backend = MarkdownTemplateBackend()
+
+    result = asyncio.run(
+        backend.asend(
+            template_name="test_message",
+            from_email="from@example.com",
+            recipient_list=["to@example.com"],
+            context={"name": "Async Return"},
+        )
+    )
+
+    # pytest-django uses setup_test_environment() which switches EMAIL_BACKEND to
+    # locmem; Django's locmem backend's send_messages returns the count of sent
+    # messages but the parent TemplateBackend.send() does not return that value --
+    # it returns None.
+    assert result is None
