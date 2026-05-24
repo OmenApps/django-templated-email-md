@@ -10,3 +10,5 @@
 /src/*.egg-info/
 __pycache__/
 .venv/
+*,cover
+*.cover
