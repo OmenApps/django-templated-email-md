@@ -110,6 +110,47 @@ TEMPLATED_EMAIL_DEFAULT_PREHEADER = 'Important information from Our Company'
 ```
 - **Further Reading:** [Email Preheader Best Practices](https://www.litmus.com/blog/the-ultimate-guide-to-preview-text-support/) (referred to in this blog as 'preview text')
 
+## Branding Settings
+
+### `TEMPLATED_EMAIL_BRANDING`
+- **Default:** See defaults table below
+- **Required:** No
+- **Type:** Dictionary
+- **Description:** Controls the visual branding of emails rendered by `MarkdownTemplateBackend`. Any keys you provide are merged over the built-in defaults, so you only need to specify the values you want to override. The full set of defaults reproduces the original package styling exactly, ensuring backward compatibility.
+
+**Default values:**
+
+| Key | Default | Description |
+|---|---|---|
+| `primary_color` | `#3498db` | Button backgrounds and accents |
+| `link_color` | `#3498db` | Hyperlink color |
+| `heading_color` | `#000000` | Color for h1-h4 headings |
+| `text_color` | `#333333` | Body paragraph text color |
+| `background_color` | `#f6f6f6` | Page/email background color |
+| `container_background` | `#ffffff` | Inner content container background |
+| `font_family` | `sans-serif` | Font stack for body and headings |
+| `logo_url` | `""` | URL of the logo image; empty = no logo rendered |
+| `logo_alt` | `""` | Alt text for the logo image |
+| `logo_width` | `"200"` | Width of the logo image in pixels (as a string) |
+
+- **Example:**
+```python
+TEMPLATED_EMAIL_BRANDING = {
+    "primary_color": "#e74c3c",
+    "link_color": "#e74c3c",
+    "heading_color": "#2c3e50",
+    "text_color": "#555555",
+    "background_color": "#f0f0f0",
+    "container_background": "#ffffff",
+    "font_family": "Georgia, serif",
+    "logo_url": "https://cdn.example.com/logo.png",
+    "logo_alt": "Acme Corp",
+    "logo_width": "180",
+}
+```
+
+> **Tip:** If you only want to change one or two colors, you can set just those keys and all other defaults will be preserved automatically.
+
 ## Plain Text Generation Settings
 
 ### `TEMPLATED_EMAIL_HTML2TEXT_SETTINGS`

@@ -24,6 +24,19 @@ from templated_email_md.exceptions import MarkdownRenderError
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_BRANDING: dict[str, str] = {
+    "primary_color": "#3498db",  # buttons & accents
+    "link_color": "#3498db",
+    "heading_color": "#000000",
+    "text_color": "#333333",
+    "background_color": "#f6f6f6",
+    "container_background": "#ffffff",
+    "font_family": "sans-serif",
+    "logo_url": "",  # empty = no logo rendered
+    "logo_alt": "",
+    "logo_width": "200",  # px, used as width attr
+}
+
 
 class MarkdownTemplateBackend(TemplateBackend):
     """Backend that uses Django templates and allows writing email content in Markdown.
@@ -75,6 +88,10 @@ class MarkdownTemplateBackend(TemplateBackend):
         self.default_subject = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_SUBJECT", _("Hello!"))
         self.default_preheader = getattr(settings, "TEMPLATED_EMAIL_DEFAULT_PREHEADER", _(""))
         self.base_url = getattr(settings, "TEMPLATED_EMAIL_BASE_URL", "")
+        self.branding: dict[str, str] = {
+            **DEFAULT_BRANDING,
+            **getattr(settings, "TEMPLATED_EMAIL_BRANDING", {}),
+        }
 
     def send(
         self,
@@ -287,6 +304,7 @@ class MarkdownTemplateBackend(TemplateBackend):
                 "markdown_content": html_content,
                 "subject": context.get("subject", subject),
                 "preheader": context.get("preheader", preheader),
+                "branding": self.branding,
             }
 
             # Render base template

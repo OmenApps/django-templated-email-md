@@ -9,6 +9,17 @@
     {% block styles %}
       <style>{% include "templated_email/markdown_styles.css" %}</style>
     {% endblock styles %}
+    <style>
+      body, .body { background-color: {{ branding.background_color }}; }
+      body, table td, p, ul, ol { font-family: {{ branding.font_family }}; }
+      .main { background: {{ branding.container_background }}; }
+      .content { background: {{ branding.container_background }}; }
+      a { color: {{ branding.link_color }}; }
+      h1, h2, h3, h4 { color: {{ branding.heading_color }}; font-family: {{ branding.font_family }}; }
+      p, ul, ol { color: {{ branding.text_color }}; }
+      .btn-primary table td { background-color: {{ branding.primary_color }}; }
+      .btn-primary a { background-color: {{ branding.primary_color }}; border-color: {{ branding.primary_color }}; color: #ffffff; }
+    </style>
   </head>
   <body>
     {% spaceless %}
@@ -28,6 +39,15 @@
               <table role="presentation" class="main">
                 <!-- START MAIN CONTENT AREA -->
                 {% block main %}
+                  {% block header %}
+                    {% if branding.logo_url %}
+                      <tr>
+                        <td class="wrapper" style="text-align:center;">
+                          <img src="{{ branding.logo_url }}" alt="{{ branding.logo_alt }}" width="{{ branding.logo_width }}" class="branding-logo img-responsive" style="display:block;margin:0 auto;max-width:100%;" />
+                        </td>
+                      </tr>
+                    {% endif %}
+                  {% endblock header %}
                   <tr>
                     <td class="wrapper">
                       <table role="presentation" border="0" cellpadding="0" cellspacing="0">

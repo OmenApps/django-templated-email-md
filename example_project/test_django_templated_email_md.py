@@ -998,6 +998,100 @@ def test_preview_email_nondict_context_raises_command_error():
         call_command("preview_email", "test_message", "--context", "[1, 2, 3]")
 
 
+def test_branding_defaults() -> None:
+    """Test that a fresh backend with no TEMPLATED_EMAIL_BRANDING setting has correct defaults."""
+    from django.test import override_settings
+
+    with override_settings(TEMPLATED_EMAIL_BRANDING={}):
+        fresh_backend = MarkdownTemplateBackend()
+        assert fresh_backend.branding["primary_color"] == "#3498db"
+        assert fresh_backend.branding["link_color"] == "#3498db"
+        assert fresh_backend.branding["heading_color"] == "#000000"
+        assert fresh_backend.branding["text_color"] == "#333333"
+        assert fresh_backend.branding["background_color"] == "#f6f6f6"
+        assert fresh_backend.branding["container_background"] == "#ffffff"
+        assert fresh_backend.branding["font_family"] == "sans-serif"
+        assert fresh_backend.branding["logo_url"] == ""
+        assert fresh_backend.branding["logo_alt"] == ""
+        assert fresh_backend.branding["logo_width"] == "200"
+
+
+def test_branding_merge_preserves_defaults() -> None:
+    """Test that user-supplied TEMPLATED_EMAIL_BRANDING merges over defaults without clobbering others."""
+    from django.test import override_settings
+
+    with override_settings(TEMPLATED_EMAIL_BRANDING={"primary_color": "#ff0000"}):
+        fresh_backend = MarkdownTemplateBackend()
+        # User override applied
+        assert fresh_backend.branding["primary_color"] == "#ff0000"
+        # Untouched defaults preserved
+        assert fresh_backend.branding["font_family"] == "sans-serif"
+        assert fresh_backend.branding["background_color"] == "#f6f6f6"
+        assert fresh_backend.branding["logo_url"] == ""
+
+
+def test_branding_context_backward_compatible(backend) -> None:
+    """Test that default branding reproduces the current look (backward compat regression)."""
+    response = backend._render_email("test_message", {"name": "X"})
+    # Default primary_color (#3498db) must appear somewhere in the rendered HTML
+    # (either inlined by premailer or in a remaining <style> tag)
+    assert "#3498db" in response["html"]
+
+
+def test_branding_css_overrides_applied() -> None:
+    """Test that TEMPLATED_EMAIL_BRANDING colors appear in rendered HTML output."""
+    from django.test import override_settings
+
+    with override_settings(
+        TEMPLATED_EMAIL_BRANDING={
+            "background_color": "#112233",
+            "link_color": "#abcabc",
+            "primary_color": "#deed00",
+        }
+    ):
+        fresh_backend = MarkdownTemplateBackend()
+        # background_color and link_color against test_message (has <body> and <a> link)
+        response_msg = fresh_backend._render_email("test_message", {"name": "X"})
+        assert "#112233" in response_msg["html"], "background_color not found in rendered HTML"
+        assert "#abcabc" in response_msg["html"], "link_color not found in rendered HTML"
+        # primary_color against test_button_component (has .btn-primary element to inline onto)
+        response_btn = fresh_backend._render_email("test_button_component", {})
+        assert "#deed00" in response_btn["html"], "primary_color not found in rendered HTML"
+
+
+def test_branding_logo_rendered_when_provided() -> None:
+    """Test that a logo <img> appears in output when logo_url is set."""
+    from django.test import override_settings
+
+    with override_settings(
+        TEMPLATED_EMAIL_BRANDING={
+            "logo_url": "https://cdn.example.com/logo.png",
+            "logo_alt": "Acme",
+            "logo_width": "150",
+        }
+    ):
+        fresh_backend = MarkdownTemplateBackend()
+        response = fresh_backend._render_email("test_message", {"name": "X"})
+        assert 'src="https://cdn.example.com/logo.png"' in response["html"], "logo src not found"
+        assert 'alt="Acme"' in response["html"], "logo alt not found"
+
+
+def test_branding_logo_absent_when_not_provided() -> None:
+    """Test that no logo <img> appears when logo_url is empty (the default)."""
+    from django.test import override_settings
+
+    with override_settings(TEMPLATED_EMAIL_BRANDING={}):
+        fresh_backend = MarkdownTemplateBackend()
+        response = fresh_backend._render_email("test_message", {"name": "X"})
+        # The logo src placeholder must not appear - no stray <img> from the logo block
+        assert "https://cdn.example.com/logo.png" not in response["html"]
+        # More generally: when logo_url is empty the branding logo block emits nothing,
+        # so we should not find an img tag whose src is empty (which would be malformed).
+        # We cannot assert no <img> at all since markdown_styles might produce none anyway,
+        # but we can assert the logo sentinel attribute is absent.
+        assert 'class="branding-logo"' not in response["html"]
+
+
 def test_dark_mode_meta_tags(backend) -> None:
     """Test that dark-mode color-scheme meta tags are present in rendered HTML."""
     response = backend._render_email("test_message", {"name": "Test User"})
